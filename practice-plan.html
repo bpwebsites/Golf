@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Golf — Weekly Practice Plan</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -15,13 +16,29 @@
     }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
+    /* ── AUTH OVERLAY ── */
+    #auth-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+    .auth-box { background: var(--s1); border: 1px solid var(--border); border-radius: 16px; padding: 40px; width: 100%; max-width: 380px; text-align: center; }
+    .auth-logo { width: 52px; height: 52px; background: var(--green); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 20px; }
+    .auth-box h2 { font-size: 1.3rem; margin-bottom: 6px; }
+    .auth-box p { font-size: 0.85rem; color: var(--muted); margin-bottom: 24px; }
+    .auth-input { width: 100%; padding: 10px 14px; background: var(--s2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.9rem; margin-bottom: 12px; }
+    .auth-input:focus { outline: none; border-color: var(--accent); }
+    .auth-btn { width: 100%; padding: 11px; background: var(--green); color: #fff; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .auth-btn:hover { background: var(--greenl); }
+    .auth-msg { font-size: 0.8rem; margin-top: 14px; color: var(--muted); min-height: 18px; }
+    .auth-msg.success { color: var(--greenl); }
+    .auth-msg.error   { color: var(--redl); }
+
     .topbar { background: var(--s1); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; gap: 16px; }
     .topbar-logo { width: 32px; height: 32px; background: var(--green); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
     .topbar h1 { font-size: 1rem; font-weight: 600; }
-    .nav-links { margin-left: auto; display: flex; gap: 8px; }
+    .nav-links { margin-left: auto; display: flex; gap: 8px; align-items: center; }
     .nav-link { padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 500; border: 1px solid var(--border); color: var(--muted); text-decoration: none; transition: all 0.15s; }
     .nav-link:hover { border-color: var(--greenl); color: var(--text); }
     .nav-link.active { background: var(--green); border-color: var(--green); color: #fff; }
+    .user-badge { font-size: 0.75rem; color: var(--muted); padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+    .user-badge:hover { color: var(--redl); border-color: var(--redl); }
 
     main { max-width: 1100px; margin: 0 auto; padding: 24px; }
 
@@ -93,7 +110,6 @@
     .drill-check-name { font-size: 0.83rem; font-weight: 600; }
     .drill-check-desc { font-size: 0.72rem; color: var(--muted); line-height: 1.4; }
 
-    /* ── YARDAGE TABLE ── */
     .yardage-wrap { overflow-x: auto; }
     .yardage-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; min-width: 500px; }
     .yardage-table th { padding: 8px 10px; text-align: center; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid var(--border); }
@@ -106,7 +122,6 @@
     .clock-header { font-size: 0.75rem; }
     .clock-sub { font-size: 0.6rem; color: var(--muted); display: block; margin-top: 2px; }
 
-    /* ── GARMIN IMPORT ── */
     .garmin-import { border: 2px dashed var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 20px; background: rgba(56,139,253,0.03); }
     .garmin-import:hover, .garmin-import.drag { border-color: var(--bluel); background: rgba(56,139,253,0.08); }
     .garmin-import h4 { font-size: 0.9rem; margin-bottom: 4px; color: var(--bluel); }
@@ -124,6 +139,8 @@
     .btn-save:hover { background: var(--greenl); }
     .save-confirm { font-size: 0.8rem; color: var(--greenl); display: none; }
 
+    .loading { text-align: center; padding: 60px; color: var(--muted); font-size: 0.9rem; }
+
     @media(max-width: 700px) {
       .form-row, .form-row.three { grid-template-columns: 1fr; }
       .day-strip { gap: 4px; }
@@ -133,12 +150,25 @@
 </head>
 <body>
 
+<!-- AUTH OVERLAY -->
+<div id="auth-overlay">
+  <div class="auth-box">
+    <div class="auth-logo">⛳</div>
+    <h2>Golf Tracker</h2>
+    <p>Enter your email — we'll send you a magic link to sign in. No password needed.</p>
+    <input type="email" class="auth-input" id="auth-email" placeholder="your@email.com" />
+    <button class="auth-btn" onclick="sendMagicLink()">Send Magic Link</button>
+    <div class="auth-msg" id="auth-msg"></div>
+  </div>
+</div>
+
 <div class="topbar">
   <div class="topbar-logo">⛳</div>
   <h1>Golf Tracker</h1>
   <div class="nav-links">
     <a href="index.html" class="nav-link">Shot Tracker</a>
     <a href="practice-plan.html" class="nav-link active">Practice Plan</a>
+    <span class="user-badge" id="user-badge" onclick="signOut()" style="display:none"></span>
   </div>
 </div>
 
@@ -160,6 +190,78 @@
 </main>
 
 <script>
+// ── SUPABASE ──────────────────────────────────────────────────
+const SUPABASE_URL  = 'https://usmflgyfsjbadhwtyhop.supabase.co';
+const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzbWZsZ3lmc2piYWRod3R5aG9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MjY5MDYsImV4cCI6MjA5NTUwMjkwNn0.3VaO1iK3Gj_bg5d1S4BN6ZdGZlxt3EzPU-EqdCVQHHQ';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null;
+let weekCache   = {};
+
+async function sendMagicLink() {
+  const email = document.getElementById('auth-email').value.trim();
+  const msgEl = document.getElementById('auth-msg');
+  if (!email) { msgEl.textContent = 'Please enter your email.'; msgEl.className = 'auth-msg error'; return; }
+  msgEl.textContent = 'Sending…'; msgEl.className = 'auth-msg';
+  const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.href } });
+  if (error) { msgEl.textContent = error.message; msgEl.className = 'auth-msg error'; }
+  else { msgEl.textContent = '✓ Check your email for the magic link!'; msgEl.className = 'auth-msg success'; }
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+  document.getElementById('auth-overlay').style.display = 'flex';
+  document.getElementById('user-badge').style.display = 'none';
+  weekCache = {};
+}
+
+async function onSignedIn(user) {
+  currentUser = user;
+  document.getElementById('auth-overlay').style.display = 'none';
+  const badge = document.getElementById('user-badge');
+  badge.style.display = 'inline';
+  badge.textContent = user.email + ' · sign out';
+  await loadAndRender();
+}
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) { await onSignedIn(session.user); return; }
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (session?.user && !currentUser) await onSignedIn(session.user);
+  });
+}
+
+// ── STORAGE (Supabase-backed) ─────────────────────────────────
+async function loadWeekFromSupabase() {
+  if (!currentUser) return;
+  const wk = getWeekKey(currentWeekOffset);
+  const { data } = await sb.from('practice_sessions')
+    .select('day_key, data')
+    .eq('user_id', currentUser.id)
+    .eq('week_key', wk);
+  weekCache = {};
+  if (data) data.forEach(row => { weekCache[row.day_key] = row.data; });
+}
+
+function saveData(dk, data) {
+  if (!currentUser) return;
+  const wk = getWeekKey(currentWeekOffset);
+  weekCache[dk] = data;
+  sb.from('practice_sessions')
+    .upsert({ user_id: currentUser.id, week_key: wk, day_key: dk, data },
+             { onConflict: 'user_id,week_key,day_key' })
+    .then(({ error }) => { if (error) console.error('Save error:', error); });
+}
+
+function loadData(dk)  { return weekCache[dk] || {}; }
+function loadWeekData() { return weekCache; }
+
+async function loadAndRender() {
+  await loadWeekFromSupabase();
+  renderWeek();
+}
+
 // ── SCHEDULE ──────────────────────────────────────────────────
 const SCHEDULE = {
   1: { type: 'range',  sub: 'range-bs', label: 'Range',     icon: '🎯', desc: 'Ball Striking' },
@@ -171,21 +273,16 @@ const SCHEDULE = {
   0: { type: 'rest',   sub: 'rest',     label: 'Rest',      icon: '💤', desc: 'Recovery' },
 };
 
-// Clock positions for wedge yardage
 const CLOCKS = [
-  { key: '7',    label: '7 o\'clock',  sub: 'chip / bump' },
-  { key: '8',    label: '8 o\'clock',  sub: 'pitch' },
-  { key: '9',    label: '9 o\'clock',  sub: 'half swing' },
-  { key: '3q',   label: '3/4',         sub: '10–10:30' },
-  { key: 'full', label: 'Full',        sub: 'complete' },
+  { key: '7',    label: '7 o\'clock', sub: 'chip / bump' },
+  { key: '8',    label: '8 o\'clock', sub: 'pitch' },
+  { key: '9',    label: '9 o\'clock', sub: 'half swing' },
+  { key: '3q',   label: '3/4',        sub: '10–10:30' },
+  { key: 'full', label: 'Full',       sub: 'complete' },
 ];
 
-// Clubs to show in yardage chart
 const WEDGE_CLUBS = ['52', '56', 'PW', 'GW'];
 
-// How Garmin clock-position suffix maps to our key
-// Garmin uses "56-7", "56-8", "56-9" in club name
-// 3/4 might show as "56-10" or similar — we'll accept 10, 10.5, 34
 function garminClockKey(suffix) {
   if (!suffix) return 'full';
   const n = parseFloat(suffix);
@@ -218,33 +315,13 @@ function getWeekDates(offset = 0) {
   return Array.from({length:7},(_,i) => { const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
 }
 function getWeekKey(offset = 0) {
-  const dates = getWeekDates(offset);
-  return dates[0].toISOString().slice(0,10);
+  return getWeekDates(offset)[0].toISOString().slice(0,10);
 }
 function weekLabel(dates) {
   const o = {month:'short',day:'numeric'};
   return `Week of ${dates[0].toLocaleDateString('en-US',o)} – ${dates[6].toLocaleDateString('en-US',o)}, ${dates[6].getFullYear()}`;
 }
 function dayKey(date) { return date.toISOString().slice(0,10); }
-
-// ── STORAGE ───────────────────────────────────────────────────
-function saveData(dk, data) {
-  const wk = getWeekKey(currentWeekOffset);
-  const store = JSON.parse(localStorage.getItem('golfPlan')||'{}');
-  if (!store[wk]) store[wk] = {};
-  store[wk][dk] = data;
-  localStorage.setItem('golfPlan', JSON.stringify(store));
-}
-function loadData(dk) {
-  const wk = getWeekKey(currentWeekOffset);
-  const store = JSON.parse(localStorage.getItem('golfPlan')||'{}');
-  return store[wk]?.[dk] || {};
-}
-function loadWeekData() {
-  const wk = getWeekKey(currentWeekOffset);
-  const store = JSON.parse(localStorage.getItem('golfPlan')||'{}');
-  return store[wk] || {};
-}
 
 // ── WEEK RENDER ───────────────────────────────────────────────
 function renderWeek() {
@@ -329,6 +406,7 @@ function renderDayPanel(date, sched, dk) {
   attachCalcListeners();
   panel.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
+
 function closePanel() {
   activeDay = null;
   document.getElementById('day-panel').style.display = 'none';
@@ -366,18 +444,12 @@ function parseGarminCSV(text) {
 
 function extractGarminStats(rows) {
   if (!rows||!rows.length) return null;
-
-  // Determine session date from first row
   let sessionDate = null;
   const rawDate = rows[0]['Date'];
   if (rawDate) { try { sessionDate = new Date(rawDate); } catch(e){} }
-
   const attacks = rows.map(r=>parseFloat(r['Attack Angle'])).filter(x=>!isNaN(x));
   const smashes = rows.map(r=>parseFloat(r['Smash Factor'])).filter(x=>!isNaN(x)&&x>0.5&&x<2);
   const carries = rows.map(r=>parseFloat(r['Carry Distance'])).filter(x=>!isNaN(x)&&x>0);
-
-  // Build yardage map by club + clock position
-  // Club Name format: "56-7", "52-8", "56" (full), "7 Iron", etc.
   const yardageMap = {};
   rows.forEach(r => {
     const clubRaw = (r['Club Name']||'').trim();
@@ -386,44 +458,24 @@ function extractGarminStats(rows) {
     const parts   = clubRaw.split('-');
     const degree  = parts[0].trim();
     const suffix  = parts[1]?.trim();
-    // Only process wedge-type clubs (numeric degree)
     if (isNaN(parseFloat(degree))) return;
     const ck = garminClockKey(suffix);
     const mapKey = `${degree}_${ck}`;
     if (!yardageMap[mapKey]) yardageMap[mapKey] = [];
     yardageMap[mapKey].push(carry);
   });
-
   const yardages = {};
   Object.entries(yardageMap).forEach(([k,v]) => {
     yardages[k] = Math.round(v.reduce((s,x)=>s+x,0)/v.length);
   });
-
   const avgArr = arr => arr.length ? arr.reduce((s,x)=>s+x,0)/arr.length : null;
-
-  return {
-    sessionDate,
-    shots: rows.length,
-    avgAttack: avgArr(attacks),
-    avgSmash:  avgArr(smashes),
-    avgCarry:  avgArr(carries),
-    yardages,
-  };
+  return { sessionDate, shots: rows.length, avgAttack: avgArr(attacks), avgSmash: avgArr(smashes), avgCarry: avgArr(carries), yardages };
 }
 
-// Detect which practice day type a Garmin session date maps to
-function detectDayType(date) {
-  if (!date) return null;
-  const dow = date.getDay();
-  return SCHEDULE[dow]?.sub || null;
-}
-
-// Wire up Garmin import drop zones
 function setupImportZone(zoneId, inputId, dk, dayType) {
   const zone  = document.getElementById(zoneId);
   const input = document.getElementById(inputId);
   if (!zone || !input) return;
-
   zone.addEventListener('click', () => input.click());
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
   zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
@@ -450,8 +502,6 @@ function handleGarminFile(file, dk, dayType) {
 
 function applyGarminStats(stats, dayType, dk) {
   const rows = [];
-
-  // Fill attack angle + smash + shots (both range day types)
   if (dayType === 'range-bs') {
     setVal('f-attack', stats.avgAttack?.toFixed(1));
     setVal('f-smash',  stats.avgSmash?.toFixed(2));
@@ -461,7 +511,6 @@ function applyGarminStats(stats, dayType, dk) {
     if (stats.avgSmash!=null)  rows.push(['Avg smash factor', stats.avgSmash.toFixed(2)]);
     calcRangeBallStriking();
   }
-
   if (dayType === 'range-wd') {
     setVal('f-wd-attack', stats.avgAttack?.toFixed(1));
     setVal('f-wd-smash',  stats.avgSmash?.toFixed(2));
@@ -469,28 +518,21 @@ function applyGarminStats(stats, dayType, dk) {
     rows.push(['Total shots', stats.shots]);
     if (stats.avgAttack!=null) rows.push(['Avg attack angle', stats.avgAttack.toFixed(1)+'°']);
     if (stats.avgSmash!=null)  rows.push(['Avg smash factor', stats.avgSmash.toFixed(2)]);
-
-    // Fill yardage chart
     let filled = 0;
     Object.entries(stats.yardages).forEach(([mapKey, carry]) => {
       const [degree, ck] = mapKey.split('_');
-      const inputId = `yd-${degree}-${ck}`;
-      const el = document.getElementById(inputId);
+      const el = document.getElementById(`yd-${degree}-${ck}`);
       if (el) { el.value = carry; el.classList.add('auto-filled'); filled++; }
     });
     if (filled > 0) rows.push(['Yardage cells filled', filled]);
     calcWedgeDriver();
   }
-
-  // Show import result summary
   const resultEl = document.getElementById('import-result');
   if (resultEl && rows.length) {
     resultEl.style.display = 'block';
     resultEl.innerHTML = `<div class="ir-title">✓ Garmin data imported (${stats.shots} shots · ${stats.sessionDate?.toLocaleDateString('en-US',{month:'short',day:'numeric'})||'unknown date'})</div>`
       + rows.map(([k,v]) => `<div class="ir-row"><span>${k}</span><b>${v}</b></div>`).join('');
   }
-
-  // Auto-save the raw stats
   const data = loadData(dk);
   if (stats.avgAttack!=null) data.attackAngle = parseFloat(stats.avgAttack.toFixed(1));
   if (stats.avgSmash!=null)  data.smash       = parseFloat(stats.avgSmash.toFixed(2));
@@ -504,7 +546,6 @@ function setVal(id, val) {
   if (el && val!=null) el.value = val;
 }
 
-// ── GARMIN IMPORT ZONE HTML ───────────────────────────────────
 function garminImportHTML(dk, dayType) {
   return `
     <div class="garmin-import" id="garmin-zone">
@@ -518,27 +559,16 @@ function garminImportHTML(dk, dayType) {
     <div class="import-result" id="import-result"></div>`;
 }
 
-// ── FORM: RANGE — BALL STRIKING (Monday) ─────────────────────
+// ── FORM: RANGE — BALL STRIKING ───────────────────────────────
 function formRangeBallStriking(d, dk) {
   return `
     <div class="form-section">
       ${garminImportHTML(dk, 'range-bs')}
       <div class="form-section-title">Garmin Stats</div>
       <div class="form-row three">
-        <div class="form-group">
-          <label>Total Shots Hit</label>
-          <input type="number" id="f-shots" value="${d.shots||''}" placeholder="e.g. 60" />
-        </div>
-        <div class="form-group">
-          <label>Avg Attack Angle (°)</label>
-          <input type="number" id="f-attack" step="0.1" value="${d.attackAngle||''}" placeholder="e.g. -4.2" oninput="calcRangeBallStriking()" />
-          <span class="hint">Target: −3° to −5°</span>
-        </div>
-        <div class="form-group">
-          <label>Avg Smash Factor</label>
-          <input type="number" id="f-smash" step="0.01" value="${d.smash||''}" placeholder="e.g. 1.44" oninput="calcRangeBallStriking()" />
-          <span class="hint">Target: 1.44+</span>
-        </div>
+        <div class="form-group"><label>Total Shots Hit</label><input type="number" id="f-shots" value="${d.shots||''}" placeholder="e.g. 60" /></div>
+        <div class="form-group"><label>Avg Attack Angle (°)</label><input type="number" id="f-attack" step="0.1" value="${d.attackAngle||''}" placeholder="e.g. -4.2" oninput="calcRangeBallStriking()" /><span class="hint">Target: −3° to −5°</span></div>
+        <div class="form-group"><label>Avg Smash Factor</label><input type="number" id="f-smash" step="0.01" value="${d.smash||''}" placeholder="e.g. 1.44" oninput="calcRangeBallStriking()" /><span class="hint">Target: 1.44+</span></div>
       </div>
       <div class="calc-row" id="calc-range-bs"></div>
     </div>
@@ -555,7 +585,7 @@ function formRangeBallStriking(d, dk) {
     ${notesHTML(d.notes)}`;
 }
 
-// ── FORM: SHORT GAME (Tuesday) ────────────────────────────────
+// ── FORM: SHORT GAME ─────────────────────────────────────────
 function formShortGame(d) {
   return `
     <div class="form-section">
@@ -594,7 +624,7 @@ function formShortGame(d) {
     ${notesHTML(d.notes)}`;
 }
 
-// ── FORM: SIMULATOR (Thursday) ────────────────────────────────
+// ── FORM: SIMULATOR ───────────────────────────────────────────
 function formSimulator(d) {
   return `
     <div class="form-section">
@@ -639,7 +669,7 @@ function formSimulator(d) {
     </div>`;
 }
 
-// ── FORM: PLAYING PRACTICE (Friday) ──────────────────────────
+// ── FORM: PLAYING PRACTICE ────────────────────────────────────
 function formPlayingPractice(d) {
   return `
     <div class="form-section">
@@ -676,16 +706,14 @@ function formPlayingPractice(d) {
     ${notesHTML(d.notes)}`;
 }
 
-// ── FORM: WEDGE + DRIVER (Saturday) ──────────────────────────
+// ── FORM: WEDGE + DRIVER ──────────────────────────────────────
 function formWedgeDriver(d, dk) {
   const yd = d.yardages || {};
   return `
     <div class="form-section">
       ${garminImportHTML(dk, 'range-wd')}
       <div class="form-section-title">Wedge Yardage Chart — Clock Positions</div>
-      <p style="font-size:0.78rem;color:var(--muted);margin-bottom:12px">
-        Hit 5 balls at each position, log average carry. Blue = auto-filled from Garmin.
-      </p>
+      <p style="font-size:0.78rem;color:var(--muted);margin-bottom:12px">Hit 5 balls at each position, log average carry. Blue = auto-filled from Garmin.</p>
       <div class="yardage-wrap">
         <table class="yardage-table">
           <thead>
@@ -711,7 +739,6 @@ function formWedgeDriver(d, dk) {
         </table>
       </div>
     </div>
-
     <div class="form-section">
       <div class="form-section-title">Driver</div>
       <div class="form-row">
@@ -720,7 +747,6 @@ function formWedgeDriver(d, dk) {
       </div>
       <div class="calc-row" id="calc-driver"></div>
     </div>
-
     <div class="form-section">
       <div class="form-section-title">Pressure Drill — 150yd Target</div>
       <p style="font-size:0.78rem;color:var(--muted);margin-bottom:10px">10 balls · 3pts inside 15ft · 1pt inside 30ft · 0pts outside · Max 30pts</p>
@@ -730,7 +756,6 @@ function formWedgeDriver(d, dk) {
       </div>
       <div class="calc-row" id="calc-pres"></div>
     </div>
-
     <div class="form-section">
       <div class="form-section-title">Garmin Stats</div>
       <div class="form-row three">
@@ -764,7 +789,6 @@ function chip(val, target, unit, label, higher=true) {
 // ── CALCS ─────────────────────────────────────────────────────
 function attachCalcListeners() {
   calcRangeBallStriking(); calcShortGame(); calcSim(); calcPP(); calcWedgeDriver();
-  // Set up import zones after form is rendered
   const dk = activeDay;
   const dates = getWeekDates(currentWeekOffset);
   const date  = dates.find(d=>dayKey(d)===dk);
@@ -842,22 +866,18 @@ function cacheYardage(dk, storeKey, val) {
   saveData(dk, data);
 }
 
-// ── SAVE DAY ─────────────────────────────────────────────────
+// ── SAVE DAY ──────────────────────────────────────────────────
 function saveDay(dk) {
   const data = loadData(dk);
   data.done  = true;
   const g  = id => { const el=document.getElementById(id); return el?el.value:undefined; };
   const gn = id => { const v=parseFloat(g(id)); return isNaN(v)?undefined:v; };
   const gc = id => { const el=document.getElementById(id); return el?el.checked:undefined; };
-
   data.notes = g('f-notes');
-
-  // Range — ball striking
   if (document.getElementById('f-attack')) {
     data.shots=gn('f-shots'); data.attackAngle=gn('f-attack'); data.smash=gn('f-smash');
     data.drills={teeFwd:gc('d-tee-fwd'),feet:gc('d-feet'),irons:gc('d-irons'),pump:gc('d-pump'),wedgesBs:gc('d-wedges-bs')};
   }
-  // Short game
   if (document.getElementById('f-chips-total')) {
     data.chipsTotal=gn('f-chips-total'); data.chipsClose=gn('f-chips-close');
     data.bunkerTotal=gn('f-bunk-total'); data.bunkerSaved=gn('f-bunk-saved');
@@ -866,7 +886,6 @@ function saveDay(dk) {
     if(data.bunkerTotal&&data.bunkerSaved) data.updown=Math.round((data.bunkerSaved/data.bunkerTotal)*100);
     data.drills={chip10:gc('d-chip10'),bump:gc('d-bump'),bunker:gc('d-bunker'),gate:gc('d-gate')};
   }
-  // Simulator
   if (document.getElementById('f-score')) {
     data.score=gn('f-score'); data.holes=gn('f-holes')||18; data.birdies=gn('f-birdies');
     data.bogeys=gn('f-bogeys'); data.doubles=gn('f-doubles'); data.threePutts=gn('f-3putts');
@@ -878,7 +897,6 @@ function saveDay(dk) {
     const missed=(data.holes||18)-(data.girHit||0);
     if(missed>0&&data.udMade!=null) data.scrambling=Math.round(((data.udMade||0)/missed)*100);
   }
-  // Playing practice
   if (document.getElementById('f-constraint')) {
     data.constraint=g('f-constraint'); data.holes=gn('f-pp-holes');
     data.girHit=gn('f-pp-gir'); data.fwHit=gn('f-pp-fw'); data.fwTotal=gn('f-pp-fwa');
@@ -887,15 +905,12 @@ function saveDay(dk) {
     if(data.fwHit!=null&&data.fwTotal) data.fairways=Math.round((data.fwHit/data.fwTotal)*100);
     if(data.udMade!=null&&data.udAtt) data.updown=Math.round((data.udMade/data.udAtt)*100);
   }
-  // Wedge + driver
   if (document.getElementById('f-drv-shots')) {
     data.drvShots=gn('f-drv-shots'); data.drvFw=gn('f-drv-fw');
     data.pressureScore=gn('f-pressure'); data.pressureDist=gn('f-pres-dist');
     data.attackAngle=gn('f-wd-attack'); data.smash=gn('f-wd-smash'); data.shots=gn('f-wd-shots');
     if(data.drvShots&&data.drvFw!=null) data.fairways=Math.round((data.drvFw/data.drvShots)*100);
-    // yardages already saved in real-time via cacheYardage
   }
-
   saveData(dk, data);
   const conf=document.getElementById('save-confirm');
   if(conf){conf.style.display='inline';setTimeout(()=>{conf.style.display='none';},2000);}
@@ -903,11 +918,24 @@ function saveDay(dk) {
 }
 
 // ── WEEK NAV ──────────────────────────────────────────────────
-document.getElementById('prev-week').addEventListener('click', ()=>{ currentWeekOffset--; activeDay=null; document.getElementById('day-panel').style.display='none'; renderWeek(); });
-document.getElementById('next-week').addEventListener('click', ()=>{ currentWeekOffset++; activeDay=null; document.getElementById('day-panel').style.display='none'; renderWeek(); });
-document.getElementById('go-today').addEventListener('click', ()=>{ currentWeekOffset=0; activeDay=null; document.getElementById('day-panel').style.display='none'; renderWeek(); });
+document.getElementById('prev-week').addEventListener('click', async () => {
+  currentWeekOffset--; activeDay=null;
+  document.getElementById('day-panel').style.display='none';
+  await loadAndRender();
+});
+document.getElementById('next-week').addEventListener('click', async () => {
+  currentWeekOffset++; activeDay=null;
+  document.getElementById('day-panel').style.display='none';
+  await loadAndRender();
+});
+document.getElementById('go-today').addEventListener('click', async () => {
+  currentWeekOffset=0; activeDay=null;
+  document.getElementById('day-panel').style.display='none';
+  await loadAndRender();
+});
 
-renderWeek();
+// ── BOOT ──────────────────────────────────────────────────────
+init();
 </script>
 </body>
 </html>
