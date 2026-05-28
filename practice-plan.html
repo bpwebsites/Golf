@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Golf — Weekly Practice Plan</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #0d1117; --s1: #161b22; --s2: #1c2128; --border: #30363d;
+      --green:   #2ea043; --greenl: #3fb950; --blue: #388bfd; --bluel: #79c0ff;
+      --yellow:  #d29922; --yellowl: #e3b341; --red: #da3633; --redl: #ff7b72;
+      --orange:  #e36209; --orangel: #f0883e; --purple: #8957e5; --purplel: #bc8cff;
+      --text:    #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    .topbar { background: var(--s1); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; gap: 16px; }
+    .topbar-logo { width: 32px; height: 32px; background: var(--green); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .topbar h1 { font-size: 1rem; font-weight: 600; }
+    .nav-links { margin-left: auto; display: flex; gap: 8px; }
+    .nav-link { padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 500; border: 1px solid var(--border); color: var(--muted); text-decoration: none; transition: all 0.15s; }
+    .nav-link:hover { border-color: var(--greenl); color: var(--text); }
+    .nav-link.active { background: var(--green); border-color: var(--green); color: #fff; }
+
+    main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+    .week-nav { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+    .week-nav h2 { font-size: 1rem; font-weight: 600; flex: 1; }
+    .week-btn { width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--border); background: var(--s2); color: var(--text); cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .week-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .week-today { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--s2); color: var(--muted); cursor: pointer; font-size: 0.78rem; transition: all 0.15s; }
+    .week-today:hover { border-color: var(--accent); color: var(--accent); }
+
+    .day-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 24px; }
+    .day-pill { border: 1px solid var(--border); border-radius: 10px; padding: 12px 8px; text-align: center; cursor: pointer; transition: all 0.15s; background: var(--s1); position: relative; }
+    .day-pill:hover:not(.rest) { border-color: var(--accent); }
+    .day-pill.active { border-color: var(--accent); background: rgba(56,139,253,0.1); }
+    .day-pill.rest { cursor: default; opacity: 0.5; }
+    .day-pill.done { border-color: var(--greenl); }
+    .day-pill.done::after { content: '✓'; position: absolute; top: 6px; right: 8px; font-size: 0.7rem; color: var(--greenl); font-weight: 700; }
+    .dp-name { font-size: 0.7rem; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .dp-date { font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; }
+    .dp-icon { font-size: 1.1rem; margin-bottom: 4px; }
+    .dp-type { font-size: 0.68rem; }
+    .type-range { color: var(--bluel); } .type-course { color: var(--greenl); }
+    .type-sim { color: var(--purplel); } .type-rest { color: var(--muted); }
+
+    .week-summary { background: var(--s1); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+    .summary-title { font-size: 0.78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+    .summary-title span { color: var(--accent); font-weight: 400; text-transform: none; letter-spacing: 0; }
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+    .metric-card { background: var(--s2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+    .mc-label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .mc-val { font-size: 1.4rem; font-weight: 700; line-height: 1; }
+    .mc-target { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
+    .mc-bar { height: 3px; border-radius: 2px; background: var(--border); margin-top: 8px; overflow: hidden; }
+    .mc-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s; }
+    .on-target { color: var(--greenl); } .near-target { color: var(--yellowl); } .off-target { color: var(--redl); }
+    .bar-green { background: var(--greenl); } .bar-yellow { background: var(--yellowl); } .bar-red { background: var(--redl); }
+
+    #day-panel { display: none; background: var(--s1); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+    .panel-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+    .panel-header .day-icon { font-size: 1.5rem; }
+    .panel-header h3 { font-size: 1.05rem; font-weight: 600; }
+    .panel-header p { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+    .close-btn { margin-left: auto; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.2rem; padding: 4px; }
+    .close-btn:hover { color: var(--text); }
+
+    .form-section { margin-bottom: 24px; }
+    .form-section-title { font-size: 0.72rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+    .form-row.single { grid-template-columns: 1fr; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 0.75rem; color: var(--muted); }
+    .form-group input, .form-group select, .form-group textarea { padding: 8px 10px; background: var(--s2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.85rem; font-family: inherit; transition: border-color 0.15s; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--accent); }
+    .form-group textarea { resize: vertical; min-height: 64px; }
+    .form-group .hint { font-size: 0.68rem; color: var(--muted); }
+
+    .calc-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .calc-chip { background: var(--s2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; font-size: 0.82rem; display: flex; flex-direction: column; gap: 2px; min-width: 100px; }
+    .calc-chip .cc-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .calc-chip .cc-val { font-size: 1.1rem; font-weight: 700; }
+
+    .drill-checks { display: flex; flex-direction: column; gap: 8px; }
+    .drill-check { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: var(--s2); border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: border-color 0.15s; }
+    .drill-check:hover { border-color: var(--muted); }
+    .drill-check.checked { border-color: var(--greenl); background: rgba(63,185,80,0.06); }
+    .drill-check input[type=checkbox] { margin-top: 2px; accent-color: var(--greenl); width: 14px; height: 14px; flex-shrink: 0; cursor: pointer; }
+    .drill-check-text { display: flex; flex-direction: column; gap: 2px; }
+    .drill-check-name { font-size: 0.83rem; font-weight: 600; }
+    .drill-check-desc { font-size: 0.72rem; color: var(--muted); line-height: 1.4; }
+
+    /* ── YARDAGE TABLE ── */
+    .yardage-wrap { overflow-x: auto; }
+    .yardage-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; min-width: 500px; }
+    .yardage-table th { padding: 8px 10px; text-align: center; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid var(--border); }
+    .yardage-table th.th-club { text-align: left; }
+    .yardage-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: center; }
+    .yardage-table td.td-club { text-align: left; font-weight: 600; }
+    .yardage-table input { width: 64px; padding: 5px 6px; background: var(--s2); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-size: 0.82rem; text-align: center; }
+    .yardage-table input:focus { outline: none; border-color: var(--accent); }
+    .yardage-table input.auto-filled { border-color: var(--bluel); background: rgba(56,139,253,0.08); }
+    .clock-header { font-size: 0.75rem; }
+    .clock-sub { font-size: 0.6rem; color: var(--muted); display: block; margin-top: 2px; }
+
+    /* ── GARMIN IMPORT ── */
+    .garmin-import { border: 2px dashed var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 20px; background: rgba(56,139,253,0.03); }
+    .garmin-import:hover, .garmin-import.drag { border-color: var(--bluel); background: rgba(56,139,253,0.08); }
+    .garmin-import h4 { font-size: 0.9rem; margin-bottom: 4px; color: var(--bluel); }
+    .garmin-import p { font-size: 0.78rem; color: var(--muted); }
+    .garmin-import-input { display: none; }
+
+    .import-result { background: rgba(56,139,253,0.08); border: 1px solid rgba(56,139,253,0.3); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 0.82rem; display: none; }
+    .import-result .ir-title { font-weight: 600; color: var(--bluel); margin-bottom: 8px; }
+    .import-result .ir-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid rgba(56,139,253,0.15); color: var(--muted); }
+    .import-result .ir-row:last-child { border-bottom: none; }
+    .import-result .ir-row b { color: var(--text); }
+
+    .save-row { display: flex; gap: 10px; margin-top: 8px; align-items: center; }
+    .btn-save { padding: 10px 24px; background: var(--green); color: #fff; border: none; border-radius: 8px; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .btn-save:hover { background: var(--greenl); }
+    .save-confirm { font-size: 0.8rem; color: var(--greenl); display: none; }
+
+    @media(max-width: 700px) {
+      .form-row, .form-row.three { grid-template-columns: 1fr; }
+      .day-strip { gap: 4px; }
+      .dp-type { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">⛳</div>
+  <h1>Golf Tracker</h1>
+  <div class="nav-links">
+    <a href="index.html" class="nav-link">Shot Tracker</a>
+    <a href="practice-plan.html" class="nav-link active">Practice Plan</a>
+  </div>
+</div>
+
+<main>
+  <div class="week-nav">
+    <button class="week-btn" id="prev-week">&#8249;</button>
+    <h2 id="week-label"></h2>
+    <button class="week-btn" id="next-week">&#8250;</button>
+    <button class="week-today" id="go-today">This Week</button>
+  </div>
+
+  <div class="day-strip" id="day-strip"></div>
+  <div id="day-panel"></div>
+
+  <div class="week-summary">
+    <div class="summary-title">Weekly Summary <span id="sessions-done"></span></div>
+    <div class="metrics-grid" id="metrics-grid"></div>
+  </div>
+</main>
+
+<script>
+// ── SCHEDULE ──────────────────────────────────────────────────
+const SCHEDULE = {
+  1: { type: 'range',  sub: 'range-bs', label: 'Range',     icon: '🎯', desc: 'Ball Striking' },
+  2: { type: 'course', sub: 'course-sg',label: 'Course',    icon: '⛳', desc: 'Short Game' },
+  3: { type: 'rest',   sub: 'rest',     label: 'Rest',      icon: '💤', desc: 'Recovery' },
+  4: { type: 'sim',    sub: 'sim',      label: 'Simulator', icon: '🖥️',  desc: 'Full Round' },
+  5: { type: 'course', sub: 'course-pp',label: 'Course',    icon: '🏌️',  desc: 'Playing Practice' },
+  6: { type: 'range',  sub: 'range-wd', label: 'Range',     icon: '🎯', desc: 'Wedge + Driver' },
+  0: { type: 'rest',   sub: 'rest',     label: 'Rest',      icon: '💤', desc: 'Recovery' },
+};
+
+// Clock positions for wedge yardage
+const CLOCKS = [
+  { key: '7',    label: '7 o\'clock',  sub: 'chip / bump' },
+  { key: '8',    label: '8 o\'clock',  sub: 'pitch' },
+  { key: '9',    label: '9 o\'clock',  sub: 'half swing' },
+  { key: '3q',   label: '3/4',         sub: '10–10:30' },
+  { key: 'full', label: 'Full',        sub: 'complete' },
+];
+
+// Clubs to show in yardage chart
+const WEDGE_CLUBS = ['52', '56', 'PW', 'GW'];
+
+// How Garmin clock-position suffix maps to our key
+// Garmin uses "56-7", "56-8", "56-9" in club name
+// 3/4 might show as "56-10" or similar — we'll accept 10, 10.5, 34
+function garminClockKey(suffix) {
+  if (!suffix) return 'full';
+  const n = parseFloat(suffix);
+  if (n === 7)  return '7';
+  if (n === 8)  return '8';
+  if (n === 9)  return '9';
+  if (n >= 10)  return '3q';
+  return 'full';
+}
+
+const TARGETS = {
+  gir:         { label: 'GIR %',        target: 65,   unit: '%',  higher: true  },
+  fairways:    { label: 'Fairways %',   target: 65,   unit: '%',  higher: true  },
+  putts:       { label: 'Putts/Round',  target: 29,   unit: '',   higher: false },
+  scrambling:  { label: 'Scrambling %', target: 55,   unit: '%',  higher: true  },
+  updown:      { label: 'Up & Down %',  target: 50,   unit: '%',  higher: true  },
+  chipProx:    { label: 'Chip Prox %',  target: 50,   unit: '%',  higher: true  },
+  attackAngle: { label: 'Attack Angle', target: -4,   unit: '°',  higher: true  },
+  smash:       { label: 'Smash Factor', target: 1.44, unit: '',   higher: true  },
+};
+
+let currentWeekOffset = 0;
+let activeDay = null;
+
+// ── WEEK HELPERS ──────────────────────────────────────────────
+function getWeekDates(offset = 0) {
+  const mon = new Date();
+  mon.setDate(mon.getDate() - mon.getDay() + 1 + offset * 7);
+  mon.setHours(0,0,0,0);
+  return Array.from({length:7},(_,i) => { const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
+}
+function getWeekKey(offset = 0) {
+  const dates = getWeekDates(offset);
+  return dates[0].toISOString().slice(0,10);
+}
+function weekLabel(dates) {
+  const o = {month:'short',day:'numeric'};
+  return `Week of ${dates[0].toLocaleDateString('en-US',o)} – ${dates[6].toLocaleDateString('en-US',o)}, ${dates[6].getFullYear()}`;
+}
+function dayKey(date) { return date.toISOString().slice(0,10); }
+
+// ── STORAGE ───────────────────────────────────────────────────
+function saveData(dk, data) {
+  const wk = getWeekKey(currentWeekOffset);
+  const store = JSON.parse(localStorage.getItem('golfPlan')||'{}');
+  if (!store[wk]) store[wk] = {};
+  store[wk][dk] = data;
+  localStorage.setItem('golfPlan', JSON.stringify(store));
+}
+function loadData(dk) {
+  const wk = getWeekKey(currentWeekOffset);
+  const store = JSON.parse(localStorage.getItem('golfPlan')||'{}');
+  return store[wk]?.[dk] || {};
+}
+function loadWeekData() {
+  const wk = getWeekKey(currentWeekOffset);
+  const store = JSON.parse(localStorage.getItem('golfPlan')||'{}');
+  return store[wk] || {};
+}
+
+// ── WEEK RENDER ───────────────────────────────────────────────
+function renderWeek() {
+  const dates  = getWeekDates(currentWeekOffset);
+  const wkData = loadWeekData();
+  document.getElementById('week-label').textContent = weekLabel(dates);
+  const strip = document.getElementById('day-strip');
+  strip.innerHTML = '';
+  const dNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  dates.forEach(date => {
+    const dow    = date.getDay();
+    const sched  = SCHEDULE[dow];
+    const dk     = dayKey(date);
+    const done   = !!wkData[dk]?.done;
+    const today  = date.toDateString() === new Date().toDateString();
+    const pill   = document.createElement('div');
+    pill.className = `day-pill type-${sched.type}${sched.type==='rest'?' rest':''}${done?' done':''}${activeDay===dk?' active':''}`;
+    pill.innerHTML = `
+      <div class="dp-name">${dNames[dow]}</div>
+      <div class="dp-date" style="${today?'color:var(--accent)':''}">${date.getDate()}</div>
+      <div class="dp-icon">${sched.icon}</div>
+      <div class="dp-type type-${sched.type}">${sched.desc}</div>`;
+    if (sched.type !== 'rest') pill.addEventListener('click', () => {
+      activeDay = activeDay===dk ? null : dk;
+      renderWeek();
+      if (activeDay) renderDayPanel(date, sched, dk);
+      else document.getElementById('day-panel').style.display='none';
+    });
+    strip.appendChild(pill);
+  });
+  renderSummary(wkData);
+  if (activeDay) {
+    const date = dates.find(d=>dayKey(d)===activeDay);
+    if (date) renderDayPanel(date, SCHEDULE[date.getDay()], activeDay);
+  }
+}
+
+// ── SUMMARY ───────────────────────────────────────────────────
+function renderSummary(wkData) {
+  const vals = {gir:[],fairways:[],putts:[],scrambling:[],updown:[],chipProx:[],attackAngle:[],smash:[]};
+  Object.values(wkData).forEach(d => {
+    if (!d.done) return;
+    Object.keys(vals).forEach(k => { if (d[k]!=null) vals[k].push(d[k]); });
+  });
+  const a = arr => arr.length ? arr.reduce((s,x)=>s+x,0)/arr.length : undefined;
+  const agg = Object.fromEntries(Object.entries(vals).map(([k,v])=>[k,a(v)]));
+  const done = Object.values(wkData).filter(d=>d.done).length;
+  const total = Object.values(SCHEDULE).filter(s=>s.type!=='rest').length;
+  document.getElementById('sessions-done').textContent = `${done} / ${total} sessions`;
+  document.getElementById('metrics-grid').innerHTML = Object.entries(TARGETS).map(([k,t]) => {
+    const val = agg[k];
+    if (val==null) return `<div class="metric-card"><div class="mc-label">${t.label}</div><div class="mc-val" style="color:var(--muted);font-size:1rem">No data</div><div class="mc-target">Target: ${t.target}${t.unit}</div></div>`;
+    const pct  = t.higher ? Math.min(100,(val/t.target)*100) : Math.min(100,(t.target/val)*100);
+    const good = t.higher ? val>=t.target : val<=t.target;
+    const close= t.higher ? val>=t.target*0.9 : val<=t.target*1.1;
+    const cls  = good?'on-target':close?'near-target':'off-target';
+    const bc   = good?'bar-green':close?'bar-yellow':'bar-red';
+    const disp = k==='smash'?val.toFixed(2):k==='attackAngle'?val.toFixed(1)+'°':Math.round(val)+t.unit;
+    return `<div class="metric-card"><div class="mc-label">${t.label}</div><div class="mc-val ${cls}">${disp}</div><div class="mc-target">Target: ${t.target}${t.unit}</div><div class="mc-bar"><div class="mc-bar-fill ${bc}" style="width:${pct}%"></div></div></div>`;
+  }).join('');
+}
+
+// ── DAY PANEL ─────────────────────────────────────────────────
+function renderDayPanel(date, sched, dk) {
+  const panel = document.getElementById('day-panel');
+  panel.style.display = 'block';
+  const data = loadData(dk);
+  const dateStr = date.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  let html = `
+    <div class="panel-header">
+      <span class="day-icon">${sched.icon}</span>
+      <div><h3>${sched.label} — ${sched.desc}</h3><p>${dateStr}</p></div>
+      <button class="close-btn" onclick="closePanel()">✕</button>
+    </div>`;
+  if (sched.sub==='range-bs') html += formRangeBallStriking(data, dk);
+  else if (sched.sub==='course-sg') html += formShortGame(data);
+  else if (sched.sub==='sim')       html += formSimulator(data);
+  else if (sched.sub==='course-pp') html += formPlayingPractice(data);
+  else if (sched.sub==='range-wd')  html += formWedgeDriver(data, dk);
+  html += `<div class="save-row"><button class="btn-save" onclick="saveDay('${dk}')">Save Session</button><span class="save-confirm" id="save-confirm">✓ Saved</span></div>`;
+  panel.innerHTML = html;
+  attachCalcListeners();
+  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function closePanel() {
+  activeDay = null;
+  document.getElementById('day-panel').style.display = 'none';
+  renderWeek();
+}
+
+// ── GARMIN CSV PARSER ─────────────────────────────────────────
+function parseLine(line) {
+  const r=[]; let cur=''; let q=false;
+  for (let i=0;i<line.length;i++) {
+    const c=line[i];
+    if(c==='"'){if(q&&line[i+1]==='"'){cur+='"';i++;}else q=!q;}
+    else if(c===','&&!q){r.push(cur);cur='';}
+    else cur+=c;
+  }
+  r.push(cur); return r;
+}
+
+function parseGarminCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 3) return null;
+  const headers = parseLine(lines[0]).map(h=>h.trim().replace(/^"|"$/g,''));
+  const rows = [];
+  for (let i=2; i<lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const vals = parseLine(lines[i]).map(v=>v.trim().replace(/^"|"$/g,''));
+    const row = {};
+    headers.forEach((h,idx) => { row[h] = vals[idx]||''; });
+    const bs = parseFloat(row['Ball Speed']);
+    if (!isNaN(bs) && bs < 1) continue;
+    rows.push(row);
+  }
+  return rows.length ? rows : null;
+}
+
+function extractGarminStats(rows) {
+  if (!rows||!rows.length) return null;
+
+  // Determine session date from first row
+  let sessionDate = null;
+  const rawDate = rows[0]['Date'];
+  if (rawDate) { try { sessionDate = new Date(rawDate); } catch(e){} }
+
+  const attacks = rows.map(r=>parseFloat(r['Attack Angle'])).filter(x=>!isNaN(x));
+  const smashes = rows.map(r=>parseFloat(r['Smash Factor'])).filter(x=>!isNaN(x)&&x>0.5&&x<2);
+  const carries = rows.map(r=>parseFloat(r['Carry Distance'])).filter(x=>!isNaN(x)&&x>0);
+
+  // Build yardage map by club + clock position
+  // Club Name format: "56-7", "52-8", "56" (full), "7 Iron", etc.
+  const yardageMap = {};
+  rows.forEach(r => {
+    const clubRaw = (r['Club Name']||'').trim();
+    const carry   = parseFloat(r['Carry Distance']);
+    if (!clubRaw || isNaN(carry) || carry <= 0) return;
+    const parts   = clubRaw.split('-');
+    const degree  = parts[0].trim();
+    const suffix  = parts[1]?.trim();
+    // Only process wedge-type clubs (numeric degree)
+    if (isNaN(parseFloat(degree))) return;
+    const ck = garminClockKey(suffix);
+    const mapKey = `${degree}_${ck}`;
+    if (!yardageMap[mapKey]) yardageMap[mapKey] = [];
+    yardageMap[mapKey].push(carry);
+  });
+
+  const yardages = {};
+  Object.entries(yardageMap).forEach(([k,v]) => {
+    yardages[k] = Math.round(v.reduce((s,x)=>s+x,0)/v.length);
+  });
+
+  const avgArr = arr => arr.length ? arr.reduce((s,x)=>s+x,0)/arr.length : null;
+
+  return {
+    sessionDate,
+    shots: rows.length,
+    avgAttack: avgArr(attacks),
+    avgSmash:  avgArr(smashes),
+    avgCarry:  avgArr(carries),
+    yardages,
+  };
+}
+
+// Detect which practice day type a Garmin session date maps to
+function detectDayType(date) {
+  if (!date) return null;
+  const dow = date.getDay();
+  return SCHEDULE[dow]?.sub || null;
+}
+
+// Wire up Garmin import drop zones
+function setupImportZone(zoneId, inputId, dk, dayType) {
+  const zone  = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  if (!zone || !input) return;
+
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag');
+    const file = e.dataTransfer.files[0];
+    if (file) handleGarminFile(file, dk, dayType);
+  });
+  input.addEventListener('change', e => {
+    if (e.target.files[0]) handleGarminFile(e.target.files[0], dk, dayType);
+  });
+}
+
+function handleGarminFile(file, dk, dayType) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const rows  = parseGarminCSV(e.target.result);
+    const stats = extractGarminStats(rows);
+    if (!stats) { alert('Could not read Garmin file.'); return; }
+    applyGarminStats(stats, dayType, dk);
+  };
+  reader.readAsText(file);
+}
+
+function applyGarminStats(stats, dayType, dk) {
+  const rows = [];
+
+  // Fill attack angle + smash + shots (both range day types)
+  if (dayType === 'range-bs') {
+    setVal('f-attack', stats.avgAttack?.toFixed(1));
+    setVal('f-smash',  stats.avgSmash?.toFixed(2));
+    setVal('f-shots',  stats.shots);
+    rows.push(['Total shots', stats.shots]);
+    if (stats.avgAttack!=null) rows.push(['Avg attack angle', stats.avgAttack.toFixed(1)+'°']);
+    if (stats.avgSmash!=null)  rows.push(['Avg smash factor', stats.avgSmash.toFixed(2)]);
+    calcRangeBallStriking();
+  }
+
+  if (dayType === 'range-wd') {
+    setVal('f-wd-attack', stats.avgAttack?.toFixed(1));
+    setVal('f-wd-smash',  stats.avgSmash?.toFixed(2));
+    setVal('f-wd-shots',  stats.shots);
+    rows.push(['Total shots', stats.shots]);
+    if (stats.avgAttack!=null) rows.push(['Avg attack angle', stats.avgAttack.toFixed(1)+'°']);
+    if (stats.avgSmash!=null)  rows.push(['Avg smash factor', stats.avgSmash.toFixed(2)]);
+
+    // Fill yardage chart
+    let filled = 0;
+    Object.entries(stats.yardages).forEach(([mapKey, carry]) => {
+      const [degree, ck] = mapKey.split('_');
+      const inputId = `yd-${degree}-${ck}`;
+      const el = document.getElementById(inputId);
+      if (el) { el.value = carry; el.classList.add('auto-filled'); filled++; }
+    });
+    if (filled > 0) rows.push(['Yardage cells filled', filled]);
+    calcWedgeDriver();
+  }
+
+  // Show import result summary
+  const resultEl = document.getElementById('import-result');
+  if (resultEl && rows.length) {
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = `<div class="ir-title">✓ Garmin data imported (${stats.shots} shots · ${stats.sessionDate?.toLocaleDateString('en-US',{month:'short',day:'numeric'})||'unknown date'})</div>`
+      + rows.map(([k,v]) => `<div class="ir-row"><span>${k}</span><b>${v}</b></div>`).join('');
+  }
+
+  // Auto-save the raw stats
+  const data = loadData(dk);
+  if (stats.avgAttack!=null) data.attackAngle = parseFloat(stats.avgAttack.toFixed(1));
+  if (stats.avgSmash!=null)  data.smash       = parseFloat(stats.avgSmash.toFixed(2));
+  data.shots = stats.shots;
+  if (Object.keys(stats.yardages).length) data.yardages = stats.yardages;
+  saveData(dk, data);
+}
+
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (el && val!=null) el.value = val;
+}
+
+// ── GARMIN IMPORT ZONE HTML ───────────────────────────────────
+function garminImportHTML(dk, dayType) {
+  return `
+    <div class="garmin-import" id="garmin-zone">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--bluel)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:6px">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <h4>Import Garmin CSV</h4>
+      <p>Drop your driving range CSV here — attack angle, smash factor${dayType==='range-wd'?', and yardages':''} fill in automatically</p>
+      <input type="file" class="garmin-import-input" id="garmin-input-${dk}" accept=".csv" />
+    </div>
+    <div class="import-result" id="import-result"></div>`;
+}
+
+// ── FORM: RANGE — BALL STRIKING (Monday) ─────────────────────
+function formRangeBallStriking(d, dk) {
+  return `
+    <div class="form-section">
+      ${garminImportHTML(dk, 'range-bs')}
+      <div class="form-section-title">Garmin Stats</div>
+      <div class="form-row three">
+        <div class="form-group">
+          <label>Total Shots Hit</label>
+          <input type="number" id="f-shots" value="${d.shots||''}" placeholder="e.g. 60" />
+        </div>
+        <div class="form-group">
+          <label>Avg Attack Angle (°)</label>
+          <input type="number" id="f-attack" step="0.1" value="${d.attackAngle||''}" placeholder="e.g. -4.2" oninput="calcRangeBallStriking()" />
+          <span class="hint">Target: −3° to −5°</span>
+        </div>
+        <div class="form-group">
+          <label>Avg Smash Factor</label>
+          <input type="number" id="f-smash" step="0.01" value="${d.smash||''}" placeholder="e.g. 1.44" oninput="calcRangeBallStriking()" />
+          <span class="hint">Target: 1.44+</span>
+        </div>
+      </div>
+      <div class="calc-row" id="calc-range-bs"></div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Drills Completed</div>
+      <div class="drill-checks">
+        ${dc('d-tee-fwd',   'Tee Forward Drill',       'Tee 3" ahead — hit ball then clip the tee. Builds forward low point.', d.drills?.teeFwd)}
+        ${dc('d-feet',      'Feet Together Drill',     '15 balls feet touching. Kills hanging back on trail foot.', d.drills?.feet)}
+        ${dc('d-irons',     '7 & 9 Iron Block',        'Attack angle focus. Goal: avg above −4°.', d.drills?.irons)}
+        ${dc('d-pump',      'Pump Drill',              '3 pumps then hit — muscle memory for correct low point.', d.drills?.pump)}
+        ${dc('d-wedges-bs', 'Wedge Clock Work',        'Hit each clock position. Feel the difference in backswing length.', d.drills?.wedgesBs)}
+      </div>
+    </div>
+    ${notesHTML(d.notes)}`;
+}
+
+// ── FORM: SHORT GAME (Tuesday) ────────────────────────────────
+function formShortGame(d) {
+  return `
+    <div class="form-section">
+      <div class="form-section-title">Chipping</div>
+      <div class="form-row">
+        <div class="form-group"><label>Total Chips Hit</label><input type="number" id="f-chips-total" value="${d.chipsTotal||''}" placeholder="e.g. 30" oninput="calcShortGame()" /></div>
+        <div class="form-group"><label>Chips Within 3 Feet</label><input type="number" id="f-chips-close" value="${d.chipsClose||''}" placeholder="e.g. 14" oninput="calcShortGame()" /><span class="hint">Target: 50%+</span></div>
+      </div>
+      <div class="calc-row" id="calc-chip"></div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Bunker</div>
+      <div class="form-row">
+        <div class="form-group"><label>Bunker Shots Hit</label><input type="number" id="f-bunk-total" value="${d.bunkerTotal||''}" placeholder="e.g. 20" oninput="calcShortGame()" /></div>
+        <div class="form-group"><label>Bunker Saves (up & down)</label><input type="number" id="f-bunk-saved" value="${d.bunkerSaved||''}" placeholder="e.g. 8" oninput="calcShortGame()" /><span class="hint">Target: 50%+</span></div>
+      </div>
+      <div class="calc-row" id="calc-bunk"></div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Putting</div>
+      <div class="form-row">
+        <div class="form-group"><label>Gate Drill Makes (out of 50)</label><input type="number" id="f-gate" max="50" value="${d.gateMakes||''}" placeholder="e.g. 42" oninput="calcShortGame()" /><span class="hint">6-foot gate drill</span></div>
+        <div class="form-group"><label>20ft Lag Putts Inside 3ft (out of 10)</label><input type="number" id="f-lag" max="10" value="${d.lagMakes||''}" placeholder="e.g. 7" oninput="calcShortGame()" /></div>
+      </div>
+      <div class="calc-row" id="calc-putt"></div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Drills Completed</div>
+      <div class="drill-checks">
+        ${dc('d-chip10',  '10 Lie Chipping Challenge', '3 balls from 10 different lies around green.', d.drills?.chip10)}
+        ${dc('d-bump',    'Bump & Run w/ Putter',      'From off the green, 20–40 feet. Automatic strokes saved.', d.drills?.bump)}
+        ${dc('d-bunker',  'Bunker Streak Drill',        'Keep going until you hole or lip 3 in a row.', d.drills?.bunker)}
+        ${dc('d-gate',    'Gate Drill',                 '50 reps from 6 feet, two tees just wider than putter face.', d.drills?.gate)}
+      </div>
+    </div>
+    ${notesHTML(d.notes)}`;
+}
+
+// ── FORM: SIMULATOR (Thursday) ────────────────────────────────
+function formSimulator(d) {
+  return `
+    <div class="form-section">
+      <div class="form-section-title">Round Stats</div>
+      <div class="form-row three">
+        <div class="form-group"><label>Score</label><input type="number" id="f-score" value="${d.score||''}" placeholder="e.g. 78" /></div>
+        <div class="form-group"><label>Holes Played</label><input type="number" id="f-holes" value="${d.holes||18}" oninput="calcSim()" /></div>
+        <div class="form-group"><label>Birdies</label><input type="number" id="f-birdies" value="${d.birdies||''}" placeholder="0" /></div>
+      </div>
+      <div class="form-row three">
+        <div class="form-group"><label>Bogeys</label><input type="number" id="f-bogeys" value="${d.bogeys||''}" placeholder="0" /></div>
+        <div class="form-group"><label>Doubles+</label><input type="number" id="f-doubles" value="${d.doubles||''}" placeholder="0" /></div>
+        <div class="form-group"><label>3-Putts</label><input type="number" id="f-3putts" value="${d.threePutts||''}" placeholder="0" /></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Fairways</div>
+      <div class="form-row">
+        <div class="form-group"><label>Fairways Hit</label><input type="number" id="f-fw-hit" value="${d.fwHit||''}" placeholder="e.g. 9" oninput="calcSim()" /></div>
+        <div class="form-group"><label>Fairways Available</label><input type="number" id="f-fw-tot" value="${d.fwTotal||14}" oninput="calcSim()" /><span class="hint">Target: 65%+</span></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Greens in Regulation</div>
+      <div class="form-row">
+        <div class="form-group"><label>GIR Hit</label><input type="number" id="f-gir-hit" value="${d.girHit||''}" placeholder="e.g. 10" oninput="calcSim()" /></div>
+        <div class="form-group"><label>Total Holes</label><input type="number" id="f-gir-holes" value="${d.holes||18}" oninput="calcSim()" /><span class="hint">Target: 65%+</span></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Short Game</div>
+      <div class="form-row three">
+        <div class="form-group"><label>Total Putts</label><input type="number" id="f-putts" value="${d.putts||''}" placeholder="e.g. 30" oninput="calcSim()" /><span class="hint">Target: 28–30</span></div>
+        <div class="form-group"><label>Up & Downs Made</label><input type="number" id="f-ud-made" value="${d.udMade||''}" oninput="calcSim()" /></div>
+        <div class="form-group"><label>Up & Down Attempts</label><input type="number" id="f-ud-att" value="${d.udAtt||''}" oninput="calcSim()" /><span class="hint">Target: 50%+</span></div>
+      </div>
+      <div class="calc-row" id="calc-sim" style="flex-wrap:wrap"></div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Post-Round Notes</div>
+      <div class="form-row single"><div class="form-group"><label>Where did the round fall apart? Which 3 holes cost the most?</label><textarea id="f-notes" placeholder="e.g. Lost it on 7, 12, 16 — missed right on every approach.">${d.notes||''}</textarea></div></div>
+    </div>`;
+}
+
+// ── FORM: PLAYING PRACTICE (Friday) ──────────────────────────
+function formPlayingPractice(d) {
+  return `
+    <div class="form-section">
+      <div class="form-section-title">Session Setup</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Constraint / Format</label>
+          <select id="f-constraint">
+            <option value=""${!d.constraint?' selected':''}>-- Select --</option>
+            <option value="3wood"${d.constraint==='3wood'?' selected':''}>3-Wood off tee only</option>
+            <option value="playdown"${d.constraint==='playdown'?' selected':''}>Play it down — no improving lies</option>
+            <option value="oneclub"${d.constraint==='oneclub'?' selected':''}>One club challenge</option>
+            <option value="fatgreen"${d.constraint==='fatgreen'?' selected':''}>Fat of the green — no flag hunting</option>
+            <option value="par3s"${d.constraint==='par3s'?' selected':''}>Par 3 challenge</option>
+            <option value="freeplay"${d.constraint==='freeplay'?' selected':''}>Free play / practice round</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Holes Played</label><input type="number" id="f-pp-holes" value="${d.holes||''}" placeholder="9 or 18" oninput="calcPP()" /></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Stats</div>
+      <div class="form-row three">
+        <div class="form-group"><label>GIR Hit</label><input type="number" id="f-pp-gir" value="${d.girHit||''}" oninput="calcPP()" /></div>
+        <div class="form-group"><label>Fairways Hit</label><input type="number" id="f-pp-fw" value="${d.fwHit||''}" oninput="calcPP()" /></div>
+        <div class="form-group"><label>Fairways Available</label><input type="number" id="f-pp-fwa" value="${d.fwTotal||''}" oninput="calcPP()" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Up & Downs Made</label><input type="number" id="f-pp-ud" value="${d.udMade||''}" oninput="calcPP()" /></div>
+        <div class="form-group"><label>Up & Down Attempts</label><input type="number" id="f-pp-uda" value="${d.udAtt||''}" oninput="calcPP()" /></div>
+      </div>
+      <div class="calc-row" id="calc-pp"></div>
+    </div>
+    ${notesHTML(d.notes)}`;
+}
+
+// ── FORM: WEDGE + DRIVER (Saturday) ──────────────────────────
+function formWedgeDriver(d, dk) {
+  const yd = d.yardages || {};
+  return `
+    <div class="form-section">
+      ${garminImportHTML(dk, 'range-wd')}
+      <div class="form-section-title">Wedge Yardage Chart — Clock Positions</div>
+      <p style="font-size:0.78rem;color:var(--muted);margin-bottom:12px">
+        Hit 5 balls at each position, log average carry. Blue = auto-filled from Garmin.
+      </p>
+      <div class="yardage-wrap">
+        <table class="yardage-table">
+          <thead>
+            <tr>
+              <th class="th-club">Club</th>
+              ${CLOCKS.map(c=>`<th><span class="clock-header">${c.label}</span><span class="clock-sub">${c.sub}</span></th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${WEDGE_CLUBS.map(club => {
+              const ck = club.replace('°','');
+              return `<tr>
+                <td class="td-club">${club}</td>
+                ${CLOCKS.map(c => {
+                  const storeKey = `${ck}_${c.key}`;
+                  const val = yd[storeKey] || '';
+                  const isAuto = val && d.yardages?.[storeKey];
+                  return `<td><input type="number" id="yd-${ck}-${c.key}" value="${val}" placeholder="—" class="${isAuto?'auto-filled':''}" oninput="cacheYardage('${dk}','${storeKey}',this.value)" /></td>`;
+                }).join('')}
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">Driver</div>
+      <div class="form-row">
+        <div class="form-group"><label>Driver Shots Hit</label><input type="number" id="f-drv-shots" value="${d.drvShots||''}" placeholder="e.g. 20" oninput="calcWedgeDriver()" /></div>
+        <div class="form-group"><label>Fairways Hit</label><input type="number" id="f-drv-fw" value="${d.drvFw||''}" placeholder="e.g. 14" oninput="calcWedgeDriver()" /><span class="hint">Target: 65%+</span></div>
+      </div>
+      <div class="calc-row" id="calc-driver"></div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">Pressure Drill — 150yd Target</div>
+      <p style="font-size:0.78rem;color:var(--muted);margin-bottom:10px">10 balls · 3pts inside 15ft · 1pt inside 30ft · 0pts outside · Max 30pts</p>
+      <div class="form-row">
+        <div class="form-group"><label>Score (out of 30)</label><input type="number" id="f-pressure" max="30" value="${d.pressureScore||''}" placeholder="e.g. 18" oninput="calcWedgeDriver()" /></div>
+        <div class="form-group"><label>Target Distance (yds)</label><input type="number" id="f-pres-dist" value="${d.pressureDist||150}" placeholder="150" /></div>
+      </div>
+      <div class="calc-row" id="calc-pres"></div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">Garmin Stats</div>
+      <div class="form-row three">
+        <div class="form-group"><label>Avg Attack Angle (°)</label><input type="number" id="f-wd-attack" step="0.1" value="${d.attackAngle||''}" placeholder="e.g. -4.5" oninput="calcWedgeDriver()" /></div>
+        <div class="form-group"><label>Avg Smash Factor</label><input type="number" id="f-wd-smash" step="0.01" value="${d.smash||''}" placeholder="e.g. 1.46" oninput="calcWedgeDriver()" /></div>
+        <div class="form-group"><label>Total Shots Hit</label><input type="number" id="f-wd-shots" value="${d.shots||''}" placeholder="e.g. 65" /></div>
+      </div>
+      <div class="calc-row" id="calc-wd-stats"></div>
+    </div>
+    ${notesHTML(d.notes)}`;
+}
+
+// ── HELPERS ───────────────────────────────────────────────────
+function dc(id, name, desc, checked) {
+  return `<label class="drill-check${checked?' checked':''}" id="lbl-${id}">
+    <input type="checkbox" id="${id}" ${checked?'checked':''} onchange="this.closest('.drill-check').classList.toggle('checked',this.checked)" />
+    <div class="drill-check-text"><span class="drill-check-name">${name}</span><span class="drill-check-desc">${desc}</span></div>
+  </label>`;
+}
+function notesHTML(val) {
+  return `<div class="form-section"><div class="form-section-title">Notes</div><div class="form-row single"><div class="form-group"><textarea id="f-notes" placeholder="What worked? What didn't? Feels to remember?">${val||''}</textarea></div></div></div>`;
+}
+function pct(made, total) { if(!total||isNaN(made)||isNaN(total)) return null; return Math.round((made/total)*100); }
+function chip(val, target, unit, label, higher=true) {
+  if(val==null) return '';
+  const good=higher?val>=target:val<=target, close=higher?val>=target*0.9:val<=target*1.1;
+  const cls=good?'on-target':close?'near-target':'off-target';
+  return `<div class="calc-chip"><span class="cc-label">${label}</span><span class="cc-val ${cls}">${val}${unit}</span></div>`;
+}
+
+// ── CALCS ─────────────────────────────────────────────────────
+function attachCalcListeners() {
+  calcRangeBallStriking(); calcShortGame(); calcSim(); calcPP(); calcWedgeDriver();
+  // Set up import zones after form is rendered
+  const dk = activeDay;
+  const dates = getWeekDates(currentWeekOffset);
+  const date  = dates.find(d=>dayKey(d)===dk);
+  if (!date) return;
+  const sched = SCHEDULE[date.getDay()];
+  if (sched.sub==='range-bs') setupImportZone('garmin-zone', `garmin-input-${dk}`, dk, 'range-bs');
+  if (sched.sub==='range-wd') setupImportZone('garmin-zone', `garmin-input-${dk}`, dk, 'range-wd');
+}
+
+function calcRangeBallStriking() {
+  const atk=parseFloat(document.getElementById('f-attack')?.value);
+  const smash=parseFloat(document.getElementById('f-smash')?.value);
+  const el=document.getElementById('calc-range-bs'); if(!el) return;
+  let h='';
+  if(!isNaN(atk)){const cls=atk>=-5&&atk<=-3?'on-target':atk>=-6&&atk<=-2?'near-target':'off-target';h+=`<div class="calc-chip"><span class="cc-label">Attack Angle</span><span class="cc-val ${cls}">${atk.toFixed(1)}°</span></div>`;}
+  if(!isNaN(smash)){const cls=smash>=1.44?'on-target':smash>=1.40?'near-target':'off-target';h+=`<div class="calc-chip"><span class="cc-label">Smash Factor</span><span class="cc-val ${cls}">${smash.toFixed(2)}</span></div>`;}
+  el.innerHTML=h;
+}
+
+function calcShortGame() {
+  const chT=parseFloat(document.getElementById('f-chips-total')?.value);
+  const chC=parseFloat(document.getElementById('f-chips-close')?.value);
+  const bT=parseFloat(document.getElementById('f-bunk-total')?.value);
+  const bS=parseFloat(document.getElementById('f-bunk-saved')?.value);
+  const gate=parseFloat(document.getElementById('f-gate')?.value);
+  const lag=parseFloat(document.getElementById('f-lag')?.value);
+  const ce=document.getElementById('calc-chip'); if(ce) ce.innerHTML=chip(pct(chC,chT),50,'%','Chip Proximity');
+  const be=document.getElementById('calc-bunk'); if(be) be.innerHTML=chip(pct(bS,bT),50,'%','Bunker Save %');
+  const pe=document.getElementById('calc-putt'); if(pe) pe.innerHTML=chip(pct(gate,50),80,'%','Gate Drill')+chip(pct(lag,10),70,'%','Lag Accuracy');
+}
+
+function calcSim() {
+  const holes=parseFloat(document.getElementById('f-holes')?.value)||18;
+  const fwH=parseFloat(document.getElementById('f-fw-hit')?.value);
+  const fwT=parseFloat(document.getElementById('f-fw-tot')?.value)||14;
+  const gH=parseFloat(document.getElementById('f-gir-hit')?.value);
+  const gHoles=parseFloat(document.getElementById('f-gir-holes')?.value)||holes;
+  const putts=parseFloat(document.getElementById('f-putts')?.value);
+  const udM=parseFloat(document.getElementById('f-ud-made')?.value);
+  const udA=parseFloat(document.getElementById('f-ud-att')?.value);
+  const el=document.getElementById('calc-sim'); if(!el) return;
+  el.innerHTML=[chip(pct(fwH,fwT),65,'%','Fairways %'),chip(pct(gH,gHoles),65,'%','GIR %'),chip(isNaN(putts)?null:putts,29,' putts','Total Putts',false),chip(pct(udM,udA),50,'%','Up & Down %')].join('');
+}
+
+function calcPP() {
+  const holes=parseFloat(document.getElementById('f-pp-holes')?.value);
+  const gir=parseFloat(document.getElementById('f-pp-gir')?.value);
+  const fwH=parseFloat(document.getElementById('f-pp-fw')?.value);
+  const fwT=parseFloat(document.getElementById('f-pp-fwa')?.value);
+  const udM=parseFloat(document.getElementById('f-pp-ud')?.value);
+  const udA=parseFloat(document.getElementById('f-pp-uda')?.value);
+  const el=document.getElementById('calc-pp'); if(!el) return;
+  el.innerHTML=[chip(pct(gir,holes),65,'%','GIR %'),chip(pct(fwH,fwT),65,'%','Fairways %'),chip(pct(udM,udA),50,'%','Up & Down %')].join('');
+}
+
+function calcWedgeDriver() {
+  const drvS=parseFloat(document.getElementById('f-drv-shots')?.value);
+  const drvF=parseFloat(document.getElementById('f-drv-fw')?.value);
+  const pres=parseFloat(document.getElementById('f-pressure')?.value);
+  const atk=parseFloat(document.getElementById('f-wd-attack')?.value);
+  const smash=parseFloat(document.getElementById('f-wd-smash')?.value);
+  const dEl=document.getElementById('calc-driver'); if(dEl) dEl.innerHTML=chip(pct(drvF,drvS),65,'%','Driver Fairways %');
+  const pEl=document.getElementById('calc-pres');
+  if(pEl&&!isNaN(pres)){const pp=Math.round((pres/30)*100);const cls=pp>=60?'on-target':pp>=45?'near-target':'off-target';pEl.innerHTML=`<div class="calc-chip"><span class="cc-label">Pressure Score</span><span class="cc-val ${cls}">${pres}/30 (${pp}%)</span></div>`;}
+  const sEl=document.getElementById('calc-wd-stats');
+  if(sEl){let h='';if(!isNaN(atk)){const cls=atk>=-5&&atk<=-3?'on-target':atk>=-6&&atk<=-2?'near-target':'off-target';h+=`<div class="calc-chip"><span class="cc-label">Attack Angle</span><span class="cc-val ${cls}">${atk.toFixed(1)}°</span></div>`;}if(!isNaN(smash)){const cls=smash>=1.44?'on-target':smash>=1.40?'near-target':'off-target';h+=`<div class="calc-chip"><span class="cc-label">Smash Factor</span><span class="cc-val ${cls}">${smash.toFixed(2)}</span></div>`;}sEl.innerHTML=h;}
+}
+
+function cacheYardage(dk, storeKey, val) {
+  const data = loadData(dk);
+  if (!data.yardages) data.yardages = {};
+  const n = parseFloat(val);
+  if (!isNaN(n)) data.yardages[storeKey] = n;
+  else delete data.yardages[storeKey];
+  saveData(dk, data);
+}
+
+// ── SAVE DAY ─────────────────────────────────────────────────
+function saveDay(dk) {
+  const data = loadData(dk);
+  data.done  = true;
+  const g  = id => { const el=document.getElementById(id); return el?el.value:undefined; };
+  const gn = id => { const v=parseFloat(g(id)); return isNaN(v)?undefined:v; };
+  const gc = id => { const el=document.getElementById(id); return el?el.checked:undefined; };
+
+  data.notes = g('f-notes');
+
+  // Range — ball striking
+  if (document.getElementById('f-attack')) {
+    data.shots=gn('f-shots'); data.attackAngle=gn('f-attack'); data.smash=gn('f-smash');
+    data.drills={teeFwd:gc('d-tee-fwd'),feet:gc('d-feet'),irons:gc('d-irons'),pump:gc('d-pump'),wedgesBs:gc('d-wedges-bs')};
+  }
+  // Short game
+  if (document.getElementById('f-chips-total')) {
+    data.chipsTotal=gn('f-chips-total'); data.chipsClose=gn('f-chips-close');
+    data.bunkerTotal=gn('f-bunk-total'); data.bunkerSaved=gn('f-bunk-saved');
+    data.gateMakes=gn('f-gate'); data.lagMakes=gn('f-lag');
+    if(data.chipsTotal&&data.chipsClose) data.chipProx=Math.round((data.chipsClose/data.chipsTotal)*100);
+    if(data.bunkerTotal&&data.bunkerSaved) data.updown=Math.round((data.bunkerSaved/data.bunkerTotal)*100);
+    data.drills={chip10:gc('d-chip10'),bump:gc('d-bump'),bunker:gc('d-bunker'),gate:gc('d-gate')};
+  }
+  // Simulator
+  if (document.getElementById('f-score')) {
+    data.score=gn('f-score'); data.holes=gn('f-holes')||18; data.birdies=gn('f-birdies');
+    data.bogeys=gn('f-bogeys'); data.doubles=gn('f-doubles'); data.threePutts=gn('f-3putts');
+    data.fwHit=gn('f-fw-hit'); data.fwTotal=gn('f-fw-tot'); data.girHit=gn('f-gir-hit');
+    data.putts=gn('f-putts'); data.udMade=gn('f-ud-made'); data.udAtt=gn('f-ud-att');
+    if(data.fwHit!=null&&data.fwTotal) data.fairways=Math.round((data.fwHit/data.fwTotal)*100);
+    if(data.girHit!=null&&data.holes)  data.gir=Math.round((data.girHit/data.holes)*100);
+    if(data.udMade!=null&&data.udAtt)  data.updown=Math.round((data.udMade/data.udAtt)*100);
+    const missed=(data.holes||18)-(data.girHit||0);
+    if(missed>0&&data.udMade!=null) data.scrambling=Math.round(((data.udMade||0)/missed)*100);
+  }
+  // Playing practice
+  if (document.getElementById('f-constraint')) {
+    data.constraint=g('f-constraint'); data.holes=gn('f-pp-holes');
+    data.girHit=gn('f-pp-gir'); data.fwHit=gn('f-pp-fw'); data.fwTotal=gn('f-pp-fwa');
+    data.udMade=gn('f-pp-ud'); data.udAtt=gn('f-pp-uda');
+    if(data.girHit!=null&&data.holes) data.gir=Math.round((data.girHit/data.holes)*100);
+    if(data.fwHit!=null&&data.fwTotal) data.fairways=Math.round((data.fwHit/data.fwTotal)*100);
+    if(data.udMade!=null&&data.udAtt) data.updown=Math.round((data.udMade/data.udAtt)*100);
+  }
+  // Wedge + driver
+  if (document.getElementById('f-drv-shots')) {
+    data.drvShots=gn('f-drv-shots'); data.drvFw=gn('f-drv-fw');
+    data.pressureScore=gn('f-pressure'); data.pressureDist=gn('f-pres-dist');
+    data.attackAngle=gn('f-wd-attack'); data.smash=gn('f-wd-smash'); data.shots=gn('f-wd-shots');
+    if(data.drvShots&&data.drvFw!=null) data.fairways=Math.round((data.drvFw/data.drvShots)*100);
+    // yardages already saved in real-time via cacheYardage
+  }
+
+  saveData(dk, data);
+  const conf=document.getElementById('save-confirm');
+  if(conf){conf.style.display='inline';setTimeout(()=>{conf.style.display='none';},2000);}
+  renderWeek();
+}
+
+// ── WEEK NAV ──────────────────────────────────────────────────
+document.getElementById('prev-week').addEventListener('click', ()=>{ currentWeekOffset--; activeDay=null; document.getElementById('day-panel').style.display='none'; renderWeek(); });
+document.getElementById('next-week').addEventListener('click', ()=>{ currentWeekOffset++; activeDay=null; document.getElementById('day-panel').style.display='none'; renderWeek(); });
+document.getElementById('go-today').addEventListener('click', ()=>{ currentWeekOffset=0; activeDay=null; document.getElementById('day-panel').style.display='none'; renderWeek(); });
+
+renderWeek();
+</script>
+</body>
+</html>

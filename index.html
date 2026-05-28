@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Golf Tracker — Range Sessions</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #0d1117;
+      --s1:      #161b22;
+      --s2:      #1c2128;
+      --border:  #30363d;
+      --green:   #2ea043;
+      --greenl:  #3fb950;
+      --blue:    #388bfd;
+      --bluel:   #79c0ff;
+      --yellow:  #d29922;
+      --yellowl: #e3b341;
+      --red:     #da3633;
+      --redl:    #ff7b72;
+      --orange:  #e36209;
+      --orangel: #f0883e;
+      --text:    #e6edf3;
+      --muted:   #8b949e;
+      --accent:  #58a6ff;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ── TOP BAR ── */
+    .topbar { background: var(--s1); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+    .topbar-logo { width: 32px; height: 32px; background: var(--green); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .topbar h1 { font-size: 1rem; font-weight: 600; }
+    .topbar-sub { font-size: 0.8rem; color: var(--muted); margin-left: auto; }
+
+    main { max-width: 1300px; margin: 0 auto; padding: 24px; }
+
+    /* ── UPLOAD ── */
+    #upload-area { border: 2px dashed var(--border); border-radius: 12px; padding: 60px 32px; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 24px; }
+    #upload-area:hover, #upload-area.drag { border-color: var(--greenl); background: rgba(46,160,67,0.06); }
+    #upload-area h2 { font-size: 1.05rem; margin: 12px 0 6px; }
+    #upload-area p { color: var(--muted); font-size: 0.85rem; }
+    #file-in { display: none; }
+
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; background: var(--green); color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: background 0.15s; margin-top: 14px; }
+    .btn:hover { background: var(--greenl); }
+    .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); margin-top: 0; }
+    .btn-ghost:hover { background: var(--s2); border-color: var(--muted); }
+
+    /* ── PILLS / CHIPS ── */
+    .session-bar { display: none; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+    .session-pill { background: var(--s2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-size: 0.78rem; color: var(--muted); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .session-pill:hover, .session-pill.active { border-color: var(--greenl); color: #d1fae5; background: rgba(46,160,67,0.12); }
+    .session-pill.active { font-weight: 600; }
+
+    .club-filter { display: none; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+    .club-chip { padding: 5px 14px; border-radius: 20px; font-size: 0.78rem; border: 1px solid var(--border); background: var(--s2); color: var(--muted); cursor: pointer; transition: all 0.15s; }
+    .club-chip:hover { border-color: var(--blue); color: var(--bluel); }
+    .club-chip.active { background: rgba(56,139,253,0.15); border-color: var(--blue); color: var(--bluel); font-weight: 600; }
+    .filter-label { font-size: 0.78rem; color: var(--muted); }
+
+    /* ── STAT CARDS ── */
+    #stats-row { display: none; margin-bottom: 20px; }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+    .stat-card { background: var(--s1); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+    .stat-card .sl { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .stat-card .sv { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+    .stat-card .su { font-size: 0.7rem; color: var(--muted); margin-top: 3px; }
+    .sv.green  { color: var(--greenl); }
+    .sv.blue   { color: var(--bluel); }
+    .sv.yellow { color: var(--yellowl); }
+    .sv.red    { color: var(--redl); }
+    .sv.orange { color: var(--orangel); }
+
+    /* ── LAYOUT ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    @media(max-width: 800px) { .two-col { grid-template-columns: 1fr; } }
+    .panel { background: var(--s1); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .panel-title { font-size: 0.78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .panel-title span { color: var(--accent); font-weight: 400; text-transform: none; letter-spacing: 0; }
+    canvas { display: block; }
+
+    /* ── TABLE ── */
+    #table-wrap { display: none; margin-bottom: 20px; }
+    .tbl-controls { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+    .tbl-controls input { flex: 1; min-width: 180px; padding: 7px 12px; background: var(--s2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.82rem; }
+    .tbl-controls input::placeholder { color: var(--muted); }
+    .tbl-scroll { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; white-space: nowrap; }
+    thead { background: var(--s2); }
+    th { padding: 10px 14px; text-align: left; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; user-select: none; }
+    th:hover { color: var(--text); }
+    th.sorted { color: var(--accent); }
+    td { padding: 9px 14px; border-top: 1px solid var(--border); }
+    tr:hover td { background: rgba(56,139,253,0.04); }
+
+    .tag-chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; }
+    .tag-est  { background: rgba(210,153,34,0.2);  color: var(--yellowl); }
+    .tag-mea  { background: rgba(46,160,67,0.2);   color: var(--greenl); }
+    .tag-fat  { background: rgba(240,136,62,0.2);  color: var(--orangel); }
+    .tag-thin { background: rgba(56,139,253,0.2);  color: var(--bluel); }
+    .tag-ok   { background: rgba(46,160,67,0.15);  color: var(--greenl); }
+
+    .pager { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-top: 1px solid var(--border); font-size: 0.78rem; color: var(--muted); }
+    .pager-btns { display: flex; gap: 4px; }
+    .pager-btns button { padding: 3px 9px; background: var(--s2); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-size: 0.78rem; cursor: pointer; }
+    .pager-btns button:hover { background: var(--s1); border-color: var(--blue); }
+    .pager-btns button.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+    #error { background: rgba(218,54,51,0.12); border: 1px solid rgba(218,54,51,0.3); border-radius: 8px; padding: 12px 16px; color: var(--redl); margin-bottom: 16px; display: none; }
+
+    /* ── DISPERSION TOOLTIP ── */
+    #disp-canvas-wrap { position: relative; }
+    #disp-tooltip { position: absolute; background: var(--s2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 0.75rem; pointer-events: none; display: none; min-width: 160px; z-index: 10; }
+    #disp-tooltip b { display: block; margin-bottom: 4px; color: var(--bluel); }
+    #disp-tooltip span { color: var(--muted); }
+    #disp-tooltip .tt-fat  { color: var(--orangel); font-weight: 700; }
+    #disp-tooltip .tt-thin { color: var(--bluel); font-weight: 700; }
+
+    /* ── CONTACT ANALYSIS ── */
+    #contact-section { display: none; margin-bottom: 20px; }
+    .contact-bar-wrap { margin-bottom: 12px; }
+    .contact-bar { height: 24px; border-radius: 6px; overflow: hidden; display: flex; background: var(--s2); }
+    .cb-fat   { background: var(--orangel); transition: width 0.4s; }
+    .cb-clean { background: var(--greenl);  transition: width 0.4s; }
+    .cb-thin  { background: var(--bluel);   transition: width 0.4s; }
+    .contact-legend { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 12px; }
+    .cl-item { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; }
+    .cl-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .cl-dot.fat   { background: var(--orangel); }
+    .cl-dot.clean { background: var(--greenl); }
+    .cl-dot.thin  { background: var(--bluel); }
+    .contact-detail { font-size: 0.82rem; color: var(--muted); margin-top: 6px; }
+    .contact-detail b { color: var(--text); }
+
+    /* ── PRACTICE PLAN ── */
+    #practice-section { display: none; margin-bottom: 20px; }
+    .drill-block { border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+    .drill-block.sev-high   { border-color: rgba(240,136,62,0.5); background: rgba(240,136,62,0.04); }
+    .drill-block.sev-medium { border-color: rgba(210,153,34,0.4); background: rgba(210,153,34,0.03); }
+    .drill-block.sev-low    { border-color: var(--border); }
+    .drill-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .sev-badge { padding: 2px 8px; border-radius: 10px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.5px; }
+    .sev-badge.sev-high   { background: rgba(240,136,62,0.25); color: var(--orangel); }
+    .sev-badge.sev-medium { background: rgba(210,153,34,0.2);  color: var(--yellowl); }
+    .sev-badge.sev-low    { background: rgba(56,139,253,0.15); color: var(--bluel); }
+    .drill-title { font-weight: 600; font-size: 0.92rem; }
+    .drill-stats { font-size: 0.78rem; color: var(--muted); margin-bottom: 12px; }
+    .drill-item { margin-bottom: 10px; padding: 10px 12px; background: var(--s2); border-radius: 8px; border-left: 3px solid var(--border); }
+    .drill-item.p1 { border-left-color: var(--orangel); }
+    .drill-item.p2 { border-left-color: var(--yellowl); }
+    .drill-name { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; display: flex; justify-content: space-between; }
+    .drill-time { font-size: 0.75rem; color: var(--muted); font-weight: 400; }
+    .drill-desc { font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+    .drill-cue { font-size: 0.82rem; color: var(--accent); margin-top: 12px; font-style: italic; }
+    .session-step { display: flex; align-items: flex-start; gap: 10px; font-size: 0.83rem; margin-bottom: 10px; }
+    .step-num { min-width: 22px; height: 22px; background: var(--s2); border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; color: var(--accent); }
+    .no-issues { font-size: 0.85rem; color: var(--muted); padding: 8px 0; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">⛳</div>
+  <h1>Golf Tracker</h1>
+  <div style="margin-left:auto;display:flex;gap:8px">
+    <a href="index.html" style="padding:6px 14px;border-radius:6px;font-size:0.8rem;font-weight:500;border:1px solid var(--greenl);background:var(--green);color:#fff;text-decoration:none">Shot Tracker</a>
+    <a href="practice-plan.html" style="padding:6px 14px;border-radius:6px;font-size:0.8rem;font-weight:500;border:1px solid var(--border);color:var(--muted);text-decoration:none">Practice Plan</a>
+  </div>
+</div>
+<div style="background:var(--s1);border-bottom:1px solid var(--border);padding:6px 24px;font-size:0.78rem;color:var(--muted)" id="session-label">No session loaded</div>
+
+<main>
+  <div id="error"></div>
+
+  <div id="upload-area">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+    </svg>
+    <h2>Drop your Garmin Golf CSV here</h2>
+    <p>Works with Driving Range exports from Garmin Golf / Garmin Connect</p>
+    <button class="btn" onclick="document.getElementById('file-in').click()">Choose File</button>
+    <input type="file" id="file-in" accept=".csv" multiple />
+  </div>
+
+  <div class="session-bar" id="session-bar">
+    <span style="font-size:0.78rem;color:var(--muted)">Session:</span>
+  </div>
+
+  <div class="club-filter" id="club-filter">
+    <span class="filter-label">Club:</span>
+  </div>
+
+  <div id="stats-row">
+    <div class="stat-grid" id="stat-grid"></div>
+  </div>
+
+  <div class="two-col" id="charts-row" style="display:none">
+    <div class="panel">
+      <div class="panel-title">Shot Dispersion <span id="disp-count"></span></div>
+      <div id="disp-canvas-wrap">
+        <canvas id="disp-canvas" height="300"></canvas>
+        <div id="disp-tooltip"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Carry Distance — Shot by Shot</div>
+      <canvas id="dist-canvas" height="300"></canvas>
+    </div>
+  </div>
+
+  <div class="two-col" id="charts-row2" style="display:none">
+    <div class="panel">
+      <div class="panel-title">Club Speed vs Ball Speed</div>
+      <canvas id="speed-canvas" height="260"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Spin Rate Distribution</div>
+      <canvas id="spin-canvas" height="260"></canvas>
+    </div>
+  </div>
+
+  <div id="table-wrap">
+    <div class="tbl-controls">
+      <input type="text" id="tbl-search" placeholder="Search club, time, contact…" />
+      <button class="btn btn-ghost" id="export-btn">Export CSV</button>
+    </div>
+    <div class="tbl-scroll">
+      <table>
+        <thead id="tbl-head"></thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+      <div class="pager">
+        <span id="pager-info"></span>
+        <div class="pager-btns" id="pager-btns"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ── STATE ────────────────────────────────────────────────────
+let sessions   = {};
+let baselines  = {};   // per-club stats for active session
+let activeSession = null;
+let activeClub = 'All';
+let filtered   = [];
+let page       = 1;
+let tblSort    = null, tblSortDir = 1;
+const PER_PAGE = 25;
+
+// ── COL KEYS ────────────────────────────────────────────────
+const COL = {
+  date:'Date', player:'Player', club:'Club Name', clubType:'Club Type',
+  clubSpeed:'Club Speed', ballSpeed:'Ball Speed', smash:'Smash Factor',
+  launchAngle:'Launch Angle', launchDir:'Launch Direction',
+  backspin:'Backspin', sidespin:'Sidespin', spinRate:'Spin Rate',
+  spinType:'Spin Rate Type', spinAxis:'Spin Axis', apex:'Apex Height',
+  carry:'Carry Distance', carryDevA:'Carry Deviation Angle',
+  carryDevD:'Carry Deviation Distance', total:'Total Distance',
+  totalDevD:'Total Deviation Distance', attackAngle:'Attack Angle',
+  clubPath:'Club Path', clubFace:'Club Face', facePath:'Face to Path',
+  temp:'Temperature', humidity:'Relative Humidity', note:'Note', tag:'Tag',
+  tempo:'Swing Tempo',
+};
+
+// ── FILE HANDLING ────────────────────────────────────────────
+const uploadArea = document.getElementById('upload-area');
+const fileIn     = document.getElementById('file-in');
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag'));
+uploadArea.addEventListener('drop', e => { e.preventDefault(); uploadArea.classList.remove('drag'); loadFiles(e.dataTransfer.files); });
+uploadArea.addEventListener('click', e => { if (e.target.tagName !== 'BUTTON') fileIn.click(); });
+fileIn.addEventListener('change', e => loadFiles(e.target.files));
+
+function loadFiles(files) {
+  Array.from(files).forEach(f => {
+    if (!f.name.endsWith('.csv')) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const rows = parseCSV(ev.target.result);
+      if (!rows) return;
+      const key = sessionKey(f.name, rows);
+      sessions[key] = rows;
+      renderSessionBar();
+      setSession(key);
+    };
+    reader.readAsText(f);
+  });
+}
+
+function sessionKey(fname, rows) {
+  const base = fname.replace(/\.csv$/i,'').replace(/-\d{4}-\d{2}-\d{2}.*/,'').trim();
+  const d = rows[0]?.[COL.date] || '';
+  try { return base + ' — ' + new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+  catch(e) { return base; }
+}
+
+// ── CSV PARSER ───────────────────────────────────────────────
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 3) { showErr('File too short.'); return null; }
+  const headers = parseLine(lines[0]).map(h => h.trim().replace(/^"|"$/g,''));
+  const rows = [];
+  for (let i = 2; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const vals = parseLine(lines[i]).map(v => v.trim().replace(/^"|"$/g,''));
+    const row  = {};
+    headers.forEach((h,idx) => { row[h] = vals[idx] ?? ''; });
+    const bs = parseFloat(row[COL.ballSpeed]);
+    if (!isNaN(bs) && bs < 1) continue; // skip zero-ball-speed non-shots
+    rows.push(row);
+  }
+  if (!rows.length) { showErr('No valid shots found.'); return null; }
+  return rows;
+}
+
+function parseLine(line) {
+  const r=[]; let cur=''; let q=false;
+  for (let i=0; i<line.length; i++) {
+    const c=line[i];
+    if (c==='"') { if (q&&line[i+1]==='"'){cur+='"';i++;}else q=!q; }
+    else if (c===','&&!q){r.push(cur);cur='';}
+    else cur+=c;
+  }
+  r.push(cur); return r;
+}
+
+// ── SESSION / CLUB RENDER ────────────────────────────────────
+function renderSessionBar() {
+  const bar = document.getElementById('session-bar');
+  bar.innerHTML = '<span style="font-size:0.78rem;color:var(--muted)">Session:</span>';
+  Object.keys(sessions).forEach(key => {
+    const p = document.createElement('div');
+    p.className = 'session-pill' + (key===activeSession?' active':'');
+    p.textContent = key;
+    p.addEventListener('click', () => setSession(key));
+    bar.appendChild(p);
+  });
+  bar.style.display = 'flex';
+}
+
+function setSession(key) {
+  activeSession = key;
+  activeClub    = 'All';
+  document.querySelectorAll('.session-pill').forEach(p => p.classList.toggle('active', p.textContent===key));
+  const rows = sessions[key] || [];
+  baselines = buildBaselines(rows);
+  renderClubFilter();
+  applyFilters();
+  document.getElementById('session-label').textContent = key;
+  uploadArea.style.marginBottom = '16px';
+  uploadArea.querySelector('h2').textContent = 'Import another session';
+  uploadArea.querySelector('p').textContent  = 'Multiple sessions supported via tabs above';
+}
+
+function renderClubFilter() {
+  const rows  = sessions[activeSession] || [];
+  const clubs = ['All', ...new Set(rows.map(clubLabel).filter(Boolean))].sort();
+  const cf = document.getElementById('club-filter');
+  cf.innerHTML = '<span class="filter-label">Club:</span>';
+  clubs.forEach(c => {
+    const chip = document.createElement('div');
+    chip.className = 'club-chip' + (c===activeClub?' active':'');
+    chip.textContent = c;
+    chip.addEventListener('click', () => { activeClub=c; renderClubFilter(); applyFilters(); });
+    cf.appendChild(chip);
+  });
+  cf.style.display = 'flex';
+}
+
+function clubLabel(r) {
+  const n = r[COL.club], t = r[COL.clubType];
+  if (n && t && n!==t) return `${n}° ${t}`;
+  return n || t || '';
+}
+
+// ── MATH HELPERS ─────────────────────────────────────────────
+function n(row, col) { const v=parseFloat(row[col]); return isNaN(v)?null:v; }
+function avg(arr)    { const a=arr.filter(x=>x!==null); return a.length ? a.reduce((s,x)=>s+x,0)/a.length : null; }
+function std(arr)    { const a=arr.filter(x=>x!==null); if(a.length<2) return 1; const m=avg(a); return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/a.length)||1; }
+function fmt(v,d=1)  { return v===null?'—':Number(v).toFixed(d); }
+function fmtAngle(v) { return v===null?'—':(v>0?'+':'')+v.toFixed(1)+'°'; }
+function fmtDev(v)   { return v===null?'—':(v>=0?'+':'')+v.toFixed(1); }
+
+// ── BASELINE BUILDER ─────────────────────────────────────────
+function buildBaselines(rows) {
+  const clubs = {};
+  rows.forEach(r => {
+    const c = clubLabel(r);
+    if (!clubs[c]) clubs[c] = [];
+    clubs[c].push(r);
+  });
+  const bl = {};
+  Object.entries(clubs).forEach(([c, shots]) => {
+    const get = col => shots.map(r => n(r,col)).filter(x => x!==null);
+    const smashes = get(COL.smash).filter(x => x>0.5&&x<2);
+    const attacks = get(COL.attackAngle);
+    const spins   = get(COL.spinRate).filter(x => x>0);
+    const launches= get(COL.launchAngle);
+    const carries = get(COL.carry).filter(x => x>0);
+    const apexes  = get(COL.apex).filter(x => x>0);
+    bl[c] = {
+      smashAvg:  avg(smashes),  smashStd:  std(smashes),
+      attackAvg: avg(attacks),  attackStd: std(attacks),
+      spinAvg:   avg(spins),    spinStd:   std(spins),
+      launchAvg: avg(launches), launchStd: std(launches),
+      carryAvg:  avg(carries),  carryStd:  std(carries),
+      apexAvg:   avg(apexes),   apexStd:   std(apexes),
+      count: shots.length,
+    };
+  });
+  return bl;
+}
+
+
+// ── APPLY FILTERS ────────────────────────────────────────────
+function applyFilters() {
+  const rows = sessions[activeSession] || [];
+  const q = (document.getElementById('tbl-search')?.value || '').toLowerCase();
+  filtered = rows.filter(r => {
+    if (activeClub !== 'All' && clubLabel(r) !== activeClub) return false;
+    if (q) {
+      const match =
+        (r[COL.club]||'').toLowerCase().includes(q) ||
+        (r[COL.clubType]||'').toLowerCase().includes(q) ||
+        (r[COL.date]||'').toLowerCase().includes(q);
+      if (!match) return false;
+    }
+    return true;
+  });
+
+  renderStats();
+  renderDispersion();
+  renderDistChart();
+  renderSpeedChart();
+  renderSpinChart();
+  renderTable();
+
+  document.getElementById('stats-row').style.display   = 'block';
+  document.getElementById('charts-row').style.display  = 'grid';
+  document.getElementById('charts-row2').style.display = 'grid';
+  document.getElementById('table-wrap').style.display  = 'block';
+}
+
+// ── STATS CARDS ──────────────────────────────────────────────
+function renderStats() {
+  const s = filtered;
+  const carries = s.map(r=>n(r,COL.carry)).filter(x=>x!==null&&x>0);
+  const cSpeeds = s.map(r=>n(r,COL.clubSpeed)).filter(x=>x!==null&&x>0);
+  const bSpeeds = s.map(r=>n(r,COL.ballSpeed)).filter(x=>x!==null&&x>0);
+  const smashes = s.map(r=>n(r,COL.smash)).filter(x=>x!==null&&x>0.5&&x<2);
+  const spins   = s.map(r=>n(r,COL.spinRate)).filter(x=>x!==null&&x>0);
+  const devs    = s.map(r=>n(r,COL.carryDevD)).filter(x=>x!==null);
+
+  const cards = [
+    { label:'Shots',        val: s.length,               unit:'',          cls:'' },
+    { label:'Avg Carry',    val: fmt(avg(carries)),       unit:'yards',     cls:'green' },
+    { label:'Max Carry',    val: carries.length?fmt(Math.max(...carries)):'—', unit:'yards', cls:'green' },
+    { label:'Avg Club Spd', val: fmt(avg(cSpeeds)),       unit:'mph',       cls:'blue' },
+    { label:'Avg Ball Spd', val: fmt(avg(bSpeeds)),       unit:'mph',       cls:'blue' },
+    { label:'Avg Smash',    val: fmt(avg(smashes),2),     unit:'factor',    cls:'yellow' },
+    { label:'Avg Spin',     val: spins.length?fmt(avg(spins),0):'—', unit:'rpm', cls:'' },
+    { label:'Avg Deviation',val: devs.length?fmt(avg(devs.map(Math.abs))):'—', unit:'yds off-line', cls:'' },
+  ];
+  document.getElementById('stat-grid').innerHTML = cards.map(c=>`
+    <div class="stat-card">
+      <div class="sl">${c.label}</div>
+      <div class="sv ${c.cls}">${c.val}</div>
+      <div class="su">${c.unit}</div>
+    </div>`).join('');
+}
+
+
+// ── DISPERSION CHART ─────────────────────────────────────────
+function renderDispersion() {
+  const canvas = document.getElementById('disp-canvas');
+  const wrap   = document.getElementById('disp-canvas-wrap');
+  const ctx    = canvas.getContext('2d');
+  const dpr    = window.devicePixelRatio || 1;
+  const W      = wrap.clientWidth || 400;
+  const H      = 300;
+  canvas.width  = W*dpr; canvas.height = H*dpr;
+  canvas.style.width = W+'px'; canvas.style.height = H+'px';
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0,0,W,H);
+
+  const shots = filtered.filter(r => n(r,COL.carry)!==null && n(r,COL.carryDevD)!==null);
+  document.getElementById('disp-count').textContent = shots.length ? `(${shots.length} shots)` : '';
+  if (!shots.length) { ctx.fillStyle='#8b949e'; ctx.font='13px system-ui'; ctx.textAlign='center'; ctx.fillText('No data',W/2,H/2); return; }
+
+  const carries = shots.map(r=>n(r,COL.carry));
+  const devs    = shots.map(r=>n(r,COL.carryDevD));
+  const maxC    = Math.max(...carries)*1.08;
+  const minC    = Math.max(0, Math.min(...carries)*0.92);
+  const maxDev  = Math.max(Math.abs(Math.min(...devs)), Math.abs(Math.max(...devs)))*1.3||20;
+
+  const pad = {t:16, b:30, l:42, r:16};
+  const cW  = W-pad.l-pad.r, cH = H-pad.t-pad.b;
+  const xP  = d => pad.l + ((d+maxDev)/(2*maxDev))*cW;
+  const yP  = c => pad.t + (1-(c-minC)/(maxC-minC))*cH;
+
+  ctx.strokeStyle='#21262d'; ctx.lineWidth=1;
+  for (let i=0;i<=4;i++) {
+    const y=pad.t+(cH/4)*i;
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+cW,y); ctx.stroke();
+    ctx.fillStyle='#8b949e'; ctx.font='10px system-ui'; ctx.textAlign='right';
+    ctx.fillText((maxC-((maxC-minC)/4)*i).toFixed(0), pad.l-5, y+4);
+  }
+  ctx.strokeStyle='rgba(56,139,253,0.25)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(xP(0),pad.t); ctx.lineTo(xP(0),pad.t+cH); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#8b949e'; ctx.font='10px system-ui'; ctx.textAlign='center';
+  [-maxDev,-maxDev/2,0,maxDev/2,maxDev].forEach(d=>{ctx.fillText((d>=0?'+':'')+d.toFixed(0),xP(d),pad.t+cH+16);});
+  ctx.fillText('← Left  Deviation (yds)  Right →', pad.l+cW/2, pad.t+cH+28);
+
+  const minCol=[56,139,253], maxCol=[63,185,80];
+  shots.forEach((r,i) => {
+    const t = (carries[i]-minC)/(maxC-minC||1);
+    const col = minCol.map((v,j)=>Math.round(v+t*(maxCol[j]-v)));
+    ctx.beginPath();
+    ctx.arc(xP(devs[i]), yP(carries[i]), 5, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(${col.join(',')},0.75)`;
+    ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=0.5; ctx.stroke();
+  });
+
+
+  const tooltip = document.getElementById('disp-tooltip');
+  canvas.onmousemove = e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+    let hit=null;
+    shots.forEach((r,i) => { if(Math.hypot(mx-xP(devs[i]),my-yP(carries[i]))<9) hit={r,i}; });
+    if (hit) {
+      const r=hit.r, ct=r._contact;
+      tooltip.style.display='block';
+      tooltip.style.left=(xP(devs[hit.i])+10)+'px';
+      tooltip.style.top=(yP(carries[hit.i])-20)+'px';
+      tooltip.innerHTML=`<b>Shot #${hit.i+1}</b>
+        <span>Carry: ${fmt(n(r,COL.carry))} yds</span><br>
+        <span>Total: ${fmt(n(r,COL.total))} yds</span><br>
+        <span>Dev: ${fmt(n(r,COL.carryDevD))} yds</span><br>
+        <span>Attack: ${fmtAngle(n(r,COL.attackAngle))}</span><br>
+        <span>Smash: ${fmt(n(r,COL.smash),2)}</span><br>
+        <span>Club Path: ${fmtAngle(n(r,COL.clubPath))}</span><br>
+        <span>Face Angle: ${fmtAngle(n(r,COL.clubFace))}</span><br>
+        <span>Face-to-Path: ${fmtAngle(n(r,COL.facePath))}</span><br>
+        <span>Spin: ${fmt(n(r,COL.spinRate),0)} rpm</span>`;
+    } else {
+      tooltip.style.display='none';
+    }
+  };
+  canvas.onmouseleave = () => { tooltip.style.display='none'; };
+}
+
+// ── DISTANCE TREND ───────────────────────────────────────────
+function renderDistChart() {
+  const canvas = document.getElementById('dist-canvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio||1;
+  const W   = canvas.parentElement.clientWidth-40;
+  const H   = 300;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  ctx.scale(dpr,dpr); ctx.clearRect(0,0,W,H);
+
+  const shots = filtered.filter(r=>n(r,COL.carry)!==null&&n(r,COL.carry)>0);
+  if (shots.length<2) return;
+
+  const carries=shots.map(r=>n(r,COL.carry));
+  const totals =shots.map(r=>n(r,COL.total));
+  const mn=Math.max(0,Math.min(...carries)-5), mx=Math.max(...totals.filter(Boolean),...carries)+5;
+  const pad={t:16,b:26,l:42,r:12};
+  const cW=W-pad.l-pad.r, cH=H-pad.t-pad.b;
+  const xP=i=>pad.l+(i/(shots.length-1||1))*cW;
+  const yP=v=>pad.t+(1-(v-mn)/(mx-mn))*cH;
+
+  ctx.strokeStyle='#21262d'; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=pad.t+(cH/4)*i;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+cW,y);ctx.stroke();
+    ctx.fillStyle='#8b949e';ctx.font='10px system-ui';ctx.textAlign='right';
+    ctx.fillText((mx-((mx-mn)/4)*i).toFixed(0),pad.l-5,y+4);
+  }
+  const avgC=avg(carries);
+  if(avgC){
+    ctx.strokeStyle='rgba(63,185,80,0.3)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.moveTo(pad.l,yP(avgC));ctx.lineTo(pad.l+cW,yP(avgC));ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='rgba(63,185,80,0.6)';ctx.font='9px system-ui';ctx.textAlign='right';
+    ctx.fillText('avg '+avgC.toFixed(0),pad.l-2,yP(avgC)-3);
+  }
+  ctx.beginPath();ctx.strokeStyle='#3fb950';ctx.lineWidth=2;ctx.lineJoin='round';
+  ctx.moveTo(xP(0),yP(carries[0]));
+  carries.forEach((c,i)=>{if(i>0)ctx.lineTo(xP(i),yP(c));});
+  ctx.stroke();
+
+  shots.forEach((r,i)=>{
+    ctx.beginPath();ctx.arc(xP(i),yP(carries[i]),4,0,Math.PI*2);
+    ctx.fillStyle='#3fb950';ctx.fill();
+    ctx.strokeStyle='#0d1117';ctx.lineWidth=1.5;ctx.stroke();
+  });
+}
+
+// ── SPEED CHART ──────────────────────────────────────────────
+function renderSpeedChart() {
+  const canvas=document.getElementById('speed-canvas');
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.parentElement.clientWidth-40, H=260;
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
+
+  const shots=filtered.filter(r=>n(r,COL.clubSpeed)!==null&&n(r,COL.ballSpeed)!==null&&n(r,COL.clubSpeed)>0);
+  if(!shots.length) return;
+
+  const cs=shots.map(r=>n(r,COL.clubSpeed));
+  const bs=shots.map(r=>n(r,COL.ballSpeed));
+  const mnX=Math.max(0,Math.min(...cs)-3),mxX=Math.max(...cs)+3;
+  const mnY=Math.max(0,Math.min(...bs)-3),mxY=Math.max(...bs)+3;
+  const pad={t:16,b:32,l:42,r:12};
+  const cW=W-pad.l-pad.r,cH=H-pad.t-pad.b;
+  const xP=v=>pad.l+(v-mnX)/(mxX-mnX)*cW;
+  const yP=v=>pad.t+(1-(v-mnY)/(mxY-mnY))*cH;
+
+  ctx.strokeStyle='#21262d';ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=pad.t+(cH/4)*i;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+cW,y);ctx.stroke();
+    ctx.fillStyle='#8b949e';ctx.font='10px system-ui';ctx.textAlign='right';
+    ctx.fillText((mxY-((mxY-mnY)/4)*i).toFixed(0),pad.l-5,y+4);
+  }
+  ctx.strokeStyle='rgba(227,179,65,0.3)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+  ctx.beginPath();ctx.moveTo(xP(mnX),yP(mnX*1.5));ctx.lineTo(xP(mxX),yP(mxX*1.5));ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='rgba(227,179,65,0.5)';ctx.font='9px system-ui';ctx.textAlign='left';
+  ctx.fillText('1.50 smash',xP(mnX)+3,yP(mnX*1.5)-3);
+
+  shots.forEach((r,i)=>{
+    const sf = n(r,COL.smash)||(bs[i]/cs[i]);
+    const t  = Math.min(1,Math.max(0,(sf-1.0)/0.5));
+    ctx.beginPath();ctx.arc(xP(cs[i]),yP(bs[i]),4,0,Math.PI*2);
+    ctx.fillStyle=`rgba(${Math.round(56+t*7)},${Math.round(139+t*46)},${Math.round(253-t*173)},0.75)`;
+    ctx.fill();ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=0.5;ctx.stroke();
+  });
+
+  ctx.fillStyle='#8b949e';ctx.font='10px system-ui';ctx.textAlign='center';
+  ctx.fillText('Club Speed (mph)',pad.l+cW/2,H-4);
+  ctx.save();ctx.translate(12,pad.t+cH/2);ctx.rotate(-Math.PI/2);
+  ctx.fillText('Ball Speed (mph)',0,0);ctx.restore();
+}
+
+// ── SPIN HISTOGRAM ───────────────────────────────────────────
+function renderSpinChart() {
+  const canvas=document.getElementById('spin-canvas');
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.parentElement.clientWidth-40,H=260;
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
+
+  const spins=filtered.map(r=>n(r,COL.spinRate)).filter(x=>x!==null&&x>0);
+  if(!spins.length) return;
+
+  const mn=Math.min(...spins),mx=Math.max(...spins);
+  const bins=12,bw=(mx-mn)/bins;
+  const counts=Array(bins).fill(0);
+  spins.forEach(s=>{const b=Math.min(bins-1,Math.floor((s-mn)/bw));counts[b]++;});
+  const maxC=Math.max(...counts);
+
+  const pad={t:16,b:36,l:42,r:12};
+  const cW=W-pad.l-pad.r,cH=H-pad.t-pad.b;
+  const bW=cW/bins;
+
+  ctx.strokeStyle='#21262d';ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=pad.t+(cH/4)*i;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+cW,y);ctx.stroke();
+    ctx.fillStyle='#8b949e';ctx.font='10px system-ui';ctx.textAlign='right';
+    ctx.fillText(Math.round(maxC-(maxC/4)*i),pad.l-4,y+4);
+  }
+  counts.forEach((c,i)=>{
+    const h=(c/maxC)*cH;
+    ctx.fillStyle='rgba(63,185,80,0.65)';
+    ctx.fillRect(pad.l+i*bW+2,pad.t+cH-h,bW-4,h);
+  });
+  ctx.fillStyle='#8b949e';ctx.font='10px system-ui';ctx.textAlign='center';
+  [0,bins/3,2*bins/3,bins].forEach(i=>{ctx.fillText(((mn+i*bw)/1000).toFixed(1)+'k',pad.l+i*bW,pad.t+cH+14);});
+  ctx.fillText('Spin Rate (rpm)',pad.l+cW/2,H-4);
+
+  const avgSpin=avg(spins);
+  if(avgSpin){
+    const ax=pad.l+((avgSpin-mn)/(mx-mn))*cW;
+    ctx.strokeStyle='rgba(227,179,65,0.6)';ctx.lineWidth=1.5;ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.moveTo(ax,pad.t);ctx.lineTo(ax,pad.t+cH);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='rgba(227,179,65,0.8)';ctx.font='9px system-ui';ctx.textAlign='center';
+    ctx.fillText('avg '+(avgSpin/1000).toFixed(1)+'k',ax,pad.t+10);
+  }
+}
+
+// ── TABLE ────────────────────────────────────────────────────
+const COLS = [
+  { key:'time',      label:'Time',          get:r=>fmtTime(r[COL.date]) },
+  { key:'club',      label:'Club',          get:r=>clubLabel(r) },
+  { key:'carry',     label:'Carry (yds)',   get:r=>fmt(n(r,COL.carry)) },
+  { key:'total',     label:'Total (yds)',   get:r=>fmt(n(r,COL.total)) },
+  { key:'dev',       label:'Dev (yds)',     get:r=>fmtDev(n(r,COL.carryDevD)) },
+  { key:'cspd',      label:'Club Spd',      get:r=>fmt(n(r,COL.clubSpeed)) },
+  { key:'bspd',      label:'Ball Spd',      get:r=>fmt(n(r,COL.ballSpeed)) },
+  { key:'smash',     label:'Smash',         get:r=>fmt(n(r,COL.smash),2) },
+  { key:'launch',    label:'Launch°',       get:r=>fmt(n(r,COL.launchAngle)) },
+  { key:'attack',    label:'Attack°',       get:r=>fmtAngle(n(r,COL.attackAngle)) },
+  { key:'clubPath',  label:'Club Path°',    get:r=>fmtAngle(n(r,COL.clubPath)) },
+  { key:'clubFace',  label:'Face Angle°',   get:r=>fmtAngle(n(r,COL.clubFace)) },
+  { key:'facePath',  label:'Face-to-Path°', get:r=>fmtAngle(n(r,COL.facePath)) },
+  { key:'spin',      label:'Spin (rpm)',     get:r=>fmt(n(r,COL.spinRate),0) },
+  { key:'apex',      label:'Apex (yds)',     get:r=>fmt(n(r,COL.apex)) },
+  { key:'spinType',  label:'Type',          get:r=>r[COL.spinType]||'—' },
+];
+
+function fmtTime(d) {
+  if(!d) return '—';
+  try { return new Date(d).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+  catch(e){ return d; }
+}
+
+function renderTable() {
+  page=1;
+  const head=document.getElementById('tbl-head');
+  head.innerHTML='<tr>'+COLS.map(c=>`
+    <th class="${tblSort===c.key?'sorted':''}" data-key="${c.key}">${c.label}
+      <span style="opacity:0.5">${tblSort===c.key?(tblSortDir===1?'▲':'▼'):''}</span>
+    </th>`).join('')+'</tr>';
+  head.querySelectorAll('th').forEach(th=>{
+    th.addEventListener('click',()=>{
+      const k=th.dataset.key;
+      if(tblSort===k)tblSortDir*=-1;else{tblSort=k;tblSortDir=1;}
+      renderTable();
+    });
+  });
+
+  let rows=[...filtered];
+  if(tblSort){
+    const col=COLS.find(c=>c.key===tblSort);
+    rows.sort((a,b)=>{
+      let av=col.get(a),bv=col.get(b);
+      const na=parseFloat(av),nb=parseFloat(bv);
+      if(!isNaN(na)&&!isNaN(nb)) return(na-nb)*tblSortDir;
+      return String(av).localeCompare(String(bv))*tblSortDir;
+    });
+  }
+  renderTableBody(rows);
+}
+
+function renderTableBody(rows) {
+  const start=(page-1)*PER_PAGE;
+  const slice=rows.slice(start,start+PER_PAGE);
+  document.getElementById('tbl-body').innerHTML=slice.map(r=>`
+    <tr>${COLS.map(c=>{
+      let v=c.get(r);
+      let style='';
+      if(c.key==='spinType') return `<td><span class="tag-chip ${v==='Estimated'?'tag-est':'tag-mea'}">${v}</span></td>`;
+      const nv=c.key==='dev'?n(r,COL.carryDevD):c.key==='facePath'?n(r,COL.facePath):c.key==='clubPath'?n(r,COL.clubPath):c.key==='clubFace'?n(r,COL.clubFace):null;
+      if(c.key==='dev'&&nv!==null)      style=`style="color:${Math.abs(nv)<5?'var(--greenl)':Math.abs(nv)<15?'var(--yellowl)':'var(--redl)'}"`;
+      if(c.key==='facePath'&&nv!==null) style=`style="color:${Math.abs(nv)<2?'var(--greenl)':Math.abs(nv)<5?'var(--yellowl)':'var(--redl)'}"`;
+      if(c.key==='clubPath'&&nv!==null) style=`style="color:${Math.abs(nv)<3?'var(--greenl)':Math.abs(nv)<7?'var(--yellowl)':'var(--redl)'}"`;
+      if(c.key==='clubFace'&&nv!==null) style=`style="color:${Math.abs(nv)<2?'var(--greenl)':Math.abs(nv)<5?'var(--yellowl)':'var(--redl)'}"`;
+      if(c.key==='attack'&&n(r,COL.attackAngle)!==null){
+        const av=n(r,COL.attackAngle);
+        style=`style="color:${av<=-6?'var(--orangel)':av<=-4?'var(--yellowl)':'var(--greenl)'}"`;
+      }
+      return `<td ${style}>${v}</td>`;
+    }).join('')}</tr>`).join('');
+
+  const total=rows.length;
+  document.getElementById('pager-info').textContent=`${start+1}–${Math.min(start+PER_PAGE,total)} of ${total}`;
+  const pages=Math.ceil(total/PER_PAGE);
+  const pb=document.getElementById('pager-btns');
+  pb.innerHTML='';
+  for(let i=1;i<=pages;i++){
+    const b=document.createElement('button');
+    b.textContent=i;if(i===page)b.classList.add('active');
+    b.addEventListener('click',()=>{page=i;renderTableBody(rows);});
+    pb.appendChild(b);
+  }
+}
+
+// ── SEARCH / EXPORT ──────────────────────────────────────────
+document.getElementById('tbl-search').addEventListener('input', ()=>applyFilters());
+
+document.getElementById('export-btn').addEventListener('click', ()=>{
+  const headers=COLS.map(c=>c.label);
+  const rows=filtered.map(r=>COLS.map(c=>c.key==='contact'?(r._contact?.type||'clean'):c.get(r)));
+  const csv=[headers,...rows].map(row=>row.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download=(activeSession||'golf-range')+'.csv';a.click();
+});
+
+window.addEventListener('resize',()=>{if(activeSession){renderDispersion();renderDistChart();renderSpeedChart();renderSpinChart();}});
+
+function showErr(msg){const e=document.getElementById('error');e.textContent=msg;e.style.display='block';}
+</script>
+</body>
+</html>
